@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Students List | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Students</div>
+        <a href="register.html" class="nav-item">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">Add Student</span>
+        </a>
+        <a href="list.html" class="nav-item active">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Students</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>All Students</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Stats -->
+      <div id="statsCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;"></div>
+      
+      <!-- Students Table -->
+      <div class="data-table-container">
+        <div class="table-toolbar">
+          <input type="search" id="searchInput" class="search-input" placeholder="Search students...">
+          <div style="display: flex; gap: 12px;">
+            <select id="classFilter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+              <option value="">All Classes</option>
+            </select>
+            <select id="statusFilter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+              <option value="active">Active</option>
+              <option value="inactive">Deactivated</option>
+              <option value="all">All</option>
+            </select>
+            <a href="register.html" class="btn btn-primary">+ Add Student</a>
+          </div>
+        </div>
+        
+        <div id="loadingDiv" class="text-center text-muted" style="padding: 40px;">Loading students...</div>
+        
+        <table class="data-table hidden" id="studentsTable">
+          <thead>
+            <tr>
+              <th>Adm No</th>
+              <th>Name</th>
+              <th>Class</th>
+              <th>Gender</th>
+              <th>Parent Phone</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+      <h2>Edit Student</h2>
+      <form id="editForm">
+        <input type="hidden" id="editStudentId">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" id="editFirstName" required>
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" id="editLastName" required>
+        </div>
+        <div class="form-group">
+          <label>Class</label>
+          <select id="editClass" required></select>
+        </div>
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="editGender" required>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Parent Name</label>
+          <input type="text" id="editParentName">
+        </div>
+        <div class="form-group">
+          <label>Parent Phone</label>
+          <input type="tel" id="editParentPhone">
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, confirmAction } from '../js/config.js';
+    
+    let currentUser = null;
+    let allStudents = [];
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadClasses();
+      await loadStudents();
+      setupEventListeners();
+    }
+    
+    async function loadClasses() {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const selects = [document.getElementById('classFilter'), document.getElementById('editClass')];
+      selects.forEach(select => {
+        if (select.id === 'editClass') select.innerHTML = '';
+        data?.forEach(cls => {
+          const option = document.createElement('option');
+          option.value = cls.id;
+          option.textContent = cls.name;
+          select.appendChild(option);
+        });
+      });
+    }
+    
+    async function loadStudents() {
+      try {
+        const statusFilter = document.getElementById('statusFilter').value;
+        const classFilter = document.getElementById('classFilter').value;
+        const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+        
+        let query = supabase
+          .from('learners')
+          .select('*, classes(id, name)')
+          .eq('school_id', currentUser.school_id)
+          .order('created_at', { ascending: false });
+        
+        if (statusFilter === 'active') {
+          query = query.eq('active', true);
+        } else if (statusFilter === 'inactive') {
+          query = query.eq('active', false);
+        }
+        
+        if (classFilter) {
+          query = query.eq('class_id', classFilter);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allStudents = data || [];
+        
+        // Apply search filter
+        if (searchQuery) {
+          allStudents = allStudents.filter(s => 
+            s.first_name.toLowerCase().includes(searchQuery) ||
+            s.last_name.toLowerCase().includes(searchQuery) ||
+            s.admission_no.toLowerCase().includes(searchQuery)
+          );
+        }
+        
+        displayStudents(allStudents);
+        updateStats(data || []);
+        
+      } catch (error) {
+        showToast('Error loading students: ' + error.message, 'error');
+      }
+    }
+    
+    function displayStudents(students) {
+      const tbody = document.getElementById('tableBody');
+      document.getElementById('loadingDiv').classList.add('hidden');
+      document.getElementById('studentsTable').classList.remove('hidden');
+      
+      if (students.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No students found</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = students.map(student => `
+        <tr>
+          <td>${student.admission_no}</td>
+          <td><strong>${student.first_name} ${student.last_name}</strong></td>
+          <td>${student.classes?.name || 'N/A'}</td>
+          <td>${student.gender || '-'}</td>
+          <td>${student.parent_phone || '-'}</td>
+          <td>
+            ${student.active 
+              ? '<span style="color: var(--success);">✓ Active</span>' 
+              : '<span style="color: var(--danger);">✗ Inactive</span>'}
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-icon" onclick="editStudent('${student.id}')" title="Edit">✏️</button>
+              ${student.active 
+                ? `<button class="btn-icon" onclick="deleteStudent('${student.id}', '${student.first_name} ${student.last_name}')" title="Deactivate">🗑️</button>`
+                : `<button class="btn-icon" onclick="restoreStudent('${student.id}', '${student.first_name} ${student.last_name}')" title="Restore">↩️</button>`
+              }
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+    
+    function updateStats(students) {
+      const total = students.length;
+      const active = students.filter(s => s.active).length;
+      const male = students.filter(s => s.active && s.gender === 'Male').length;
+      const female = students.filter(s => s.active && s.gender === 'Female').length;
+      
+      document.getElementById('statsCards').innerHTML = `
+        <div style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 8px;">Total Students</div>
+          <div style="font-size: 2rem; font-weight: 700;">${total}</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 8px;">Active</div>
+          <div style="font-size: 2rem; font-weight: 700;">${active}</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 8px;">Male</div>
+          <div style="font-size: 2rem; font-weight: 700;">${male}</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 8px;">Female</div>
+          <div style="font-size: 2rem; font-weight: 700;">${female}</div>
+        </div>
+      `;
+    }
+    
+    window.editStudent = async function(studentId) {
+      const student = allStudents.find(s => s.id === studentId);
+      if (!student) return;
+      
+      document.getElementById('editStudentId').value = student.id;
+      document.getElementById('editFirstName').value = student.first_name;
+      document.getElementById('editLastName').value = student.last_name;
+      document.getElementById('editClass').value = student.class_id;
+      document.getElementById('editGender').value = student.gender;
+      document.getElementById('editParentName').value = student.parent_name || '';
+      document.getElementById('editParentPhone').value = student.parent_phone || '';
+      
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+    
+    window.closeEditModal = function() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+    
+    window.deleteStudent = async function(studentId, studentName) {
+      const confirmed = await confirmAction(
+        `Are you sure you want to deactivate ${studentName}?\n\nThis will:\n- Remove from active list\n- Preserve all records\n- Can be restored later`,
+        'Deactivate Student'
+      );
+      
+      if (!confirmed) return;
+      
+      try {
+        const { error } = await supabase
+          .from('learners')
+          .update({ active: false })
+          .eq('id', studentId);
+        
+        if (error) throw error;
+        
+        showToast(`${studentName} has been deactivated`);
+        await loadStudents();
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+    }
+    
+    window.restoreStudent = async function(studentId, studentName) {
+      const confirmed = await confirmAction(
+        `Restore ${studentName} to active status?`,
+        'Restore Student'
+      );
+      
+      if (!confirmed) return;
+      
+      try {
+        const { error } = await supabase
+          .from('learners')
+          .update({ active: true })
+          .eq('id', studentId);
+        
+        if (error) throw error;
+        
+        showToast(`${studentName} has been restored`);
+        await loadStudents();
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const updates = {
+          first_name: document.getElementById('editFirstName').value,
+          last_name: document.getElementById('editLastName').value,
+          class_id: document.getElementById('editClass').value,
+          gender: document.getElementById('editGender').value,
+          parent_name: document.getElementById('editParentName').value,
+          parent_phone: document.getElementById('editParentPhone').value,
+          updated_at: new Date().toISOString()
+        };
+        
+        try {
+          const { error } = await supabase
+            .from('learners')
+            .update(updates)
+            .eq('id', document.getElementById('editStudentId').value);
+          
+          if (error) throw error;
+          
+          showToast('Student updated successfully!');
+          closeEditModal();
+          await loadStudents();
+        } catch (error) {
+          showToast('Error: ' + error.message, 'error');
+        }
+      });
+      
+      document.getElementById('searchInput').addEventListener('input', loadStudents);
+      document.getElementById('classFilter').addEventListener('change', loadStudents);
+      document.getElementById('statusFilter').addEventListener('change', loadStudents);
+      
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    init();
+  </script>
+</body>
+</html>
