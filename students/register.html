@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register Student | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Students</div>
+        <a href="register.html" class="nav-item active">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">Add Student</span>
+        </a>
+        <a href="list.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Students</span>
+        </a>
+        <a href="bulk-upload.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Bulk Upload</span>
+        </a>
+        <a href="promotion.html" class="nav-item">
+          <span class="nav-icon">⬆️</span>
+          <span class="nav-text">Promotion</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Register New Student</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <div class="card">
+        <h2>Student Information</h2>
+        
+        <form id="studentForm" style="max-width: 800px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>Admission Number</label>
+              <input type="text" id="admissionNo" readonly style="background: var(--bg-secondary);">
+              <small class="text-muted">Auto-generated</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Class *</label>
+              <select id="classId" required>
+                <option value="">Select Class</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>First Name *</label>
+              <input type="text" id="firstName" required>
+            </div>
+            
+            <div class="form-group">
+              <label>Last Name *</label>
+              <input type="text" id="lastName" required>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>Middle Name</label>
+              <input type="text" id="middleName">
+            </div>
+            
+            <div class="form-group">
+              <label>Gender *</label>
+              <select id="gender" required>
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Date of Birth *</label>
+            <input type="date" id="dateOfBirth" required>
+          </div>
+          
+          <hr style="margin: 24px 0; border: none; border-top: 2px solid var(--border);">
+          
+          <h3 style="margin-bottom: 16px; color: var(--primary);">Parent/Guardian Information</h3>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>Parent/Guardian Name</label>
+              <input type="text" id="parentName">
+            </div>
+            
+            <div class="form-group">
+              <label>Phone Number</label>
+              <input type="tel" id="parentPhone" placeholder="0712345678">
+              <small class="text-muted">For SMS notifications</small>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Parent Email</label>
+            <input type="email" id="parentEmail">
+          </div>
+          
+          <div class="form-group">
+            <label>Home Address</label>
+            <textarea id="address" rows="2"></textarea>
+          </div>
+          
+          <hr style="margin: 24px 0; border: none; border-top: 2px solid var(--border);">
+          
+          <h3 style="margin-bottom: 16px; color: var(--primary);">Additional Information</h3>
+          
+          <div class="form-group">
+            <label>Medical Information</label>
+            <textarea id="medicalInfo" rows="3" placeholder="Allergies, conditions, medications, etc."></textarea>
+          </div>
+          
+          <div style="display: flex; gap: 12px; margin-top: 24px;">
+            <button type="submit" id="saveBtn" class="btn btn-primary">
+              Save Student
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('studentForm').reset()">
+              Clear Form
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, generateNumber } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadClasses();
+      await generateAdmissionNo();
+      setupEventListeners();
+    }
+    
+    async function loadClasses() {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const select = document.getElementById('classId');
+      data?.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        select.appendChild(option);
+      });
+    }
+    
+    async function generateAdmissionNo() {
+      const admNo = await generateNumber(currentUser.school_id, 'learner');
+      document.getElementById('admissionNo').value = admNo;
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('studentForm').addEventListener('submit', saveStudent);
+      
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    async function saveStudent(e) {
+      e.preventDefault();
+      
+      const studentData = {
+        school_id: currentUser.school_id,
+        admission_no: document.getElementById('admissionNo').value,
+        first_name: document.getElementById('firstName').value.trim(),
+        last_name: document.getElementById('lastName').value.trim(),
+        middle_name: document.getElementById('middleName').value.trim() || null,
+        gender: document.getElementById('gender').value,
+        date_of_birth: document.getElementById('dateOfBirth').value,
+        class_id: document.getElementById('classId').value,
+        parent_name: document.getElementById('parentName').value.trim() || null,
+        parent_phone: document.getElementById('parentPhone').value.trim() || null,
+        parent_email: document.getElementById('parentEmail').value.trim() || null,
+        address: document.getElementById('address').value.trim() || null,
+        medical_info: document.getElementById('medicalInfo').value.trim() || null,
+        active: true
+      };
+      
+      const saveBtn = document.getElementById('saveBtn');
+      setButtonLoading(saveBtn, true, 'Saving...');
+      
+      try {
+        const { error } = await supabase
+          .from('learners')
+          .insert([studentData]);
+        
+        if (error) throw error;
+        
+        showToast(`✓ ${studentData.first_name} ${studentData.last_name} registered successfully!`, 'success');
+        
+        // Reset form and generate new admission number
+        document.getElementById('studentForm').reset();
+        await generateAdmissionNo();
+        
+        // Focus on first name for next entry
+        document.getElementById('firstName').focus();
+        
+      } catch (error) {
+        showToast('Error saving student: ' + error.message, 'error');
+      } finally {
+        setButtonLoading(saveBtn, false, 'Save Student');
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
