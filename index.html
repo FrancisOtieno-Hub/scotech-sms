@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScoTech SMS | School Management System</title>
+  <link rel="manifest" href="pwa/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body class="login-page">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <img src="assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+        <h1>ScoTech SMS</h1>
+        <p class="subtitle">Modern School Management System</p>
+      </div>
+      
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input 
+            type="email" 
+            id="email" 
+            placeholder="your@email.com" 
+            autocomplete="email"
+            required 
+          />
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            placeholder="Enter your password" 
+            autocomplete="current-password"
+            required 
+          />
+        </div>
+        
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-block">
+          Sign In
+        </button>
+      </form>
+      
+      <div class="login-footer">
+        <p>Don't have an account? <a href="register-school.html">Register Your School</a></p>
+        <p class="text-muted mt-4">Powered by ScoTech © 2026</p>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="js/auth.js"></script>
+</body>
+</html>
