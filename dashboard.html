@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | ScoTech SMS</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <!-- Navigation Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="assets/logo.svg" alt="ScoTech SMS" class="logo">
+      <h2>ScoTech SMS</h2>
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Student Management</div>
+        <a href="students/register.html" class="nav-item">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">Add Student</span>
+        </a>
+        <a href="students/list.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Students</span>
+        </a>
+        <a href="students/promotion.html" class="nav-item">
+          <span class="nav-icon">⬆️</span>
+          <span class="nav-text">Promotion</span>
+        </a>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Fee Management</div>
+        <a href="fees/setup.html" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Fee Setup</span>
+        </a>
+        <a href="fees/payments.html" class="nav-item">
+          <span class="nav-icon">💳</span>
+          <span class="nav-text">Payments</span>
+        </a>
+        <a href="fees/reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Fee Reports</span>
+        </a>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Staff Management</div>
+        <a href="staff/register.html" class="nav-item">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">Add Staff</span>
+        </a>
+        <a href="staff/list.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Staff</span>
+        </a>
+        <a href="staff/roster.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Duty Roster</span>
+        </a>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Academic</div>
+        <a href="academic/timetable.html" class="nav-item">
+          <span class="nav-icon">📚</span>
+          <span class="nav-text">Timetable</span>
+        </a>
+        <a href="academic/subjects.html" class="nav-item">
+          <span class="nav-icon">📖</span>
+          <span class="nav-text">Subjects</span>
+        </a>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Finance</div>
+        <a href="finance/expenses.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Expenses</span>
+        </a>
+        <a href="finance/reports.html" class="nav-item">
+          <span class="nav-icon">📈</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Communication</div>
+        <a href="communication/sms.html" class="nav-item">
+          <span class="nav-icon">📱</span>
+          <span class="nav-text">Bulk SMS</span>
+        </a>
+      </div>
+      
+      <div class="nav-section">
+        <div class="nav-section-title">Settings</div>
+        <a href="settings/school.html" class="nav-item">
+          <span class="nav-icon">🏫</span>
+          <span class="nav-text">School Info</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1 id="schoolName">Loading...</h1>
+      </div>
+      <div class="topbar-right">
+        <span class="user-info" id="userInfo">Loading...</span>
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <!-- Dashboard Content -->
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Stats Cards -->
+      <div class="stats-grid">
+        <div class="stat-card stat-primary">
+          <div class="stat-icon">👥</div>
+          <div class="stat-content">
+            <div class="stat-label">Total Students</div>
+            <div class="stat-value" id="totalStudents">--</div>
+            <div class="stat-change">Active learners</div>
+          </div>
+        </div>
+        
+        <div class="stat-card stat-success">
+          <div class="stat-icon">💰</div>
+          <div class="stat-content">
+            <div class="stat-label">Fee Collection</div>
+            <div class="stat-value" id="feeCollection">--</div>
+            <div class="stat-change">This term</div>
+          </div>
+        </div>
+        
+        <div class="stat-card stat-warning">
+          <div class="stat-icon">👨‍🏫</div>
+          <div class="stat-content">
+            <div class="stat-label">Staff Members</div>
+            <div class="stat-value" id="totalStaff">--</div>
+            <div class="stat-change">Active staff</div>
+          </div>
+        </div>
+        
+        <div class="stat-card stat-info">
+          <div class="stat-icon">📚</div>
+          <div class="stat-content">
+            <div class="stat-label">Classes</div>
+            <div class="stat-value" id="totalClasses">--</div>
+            <div class="stat-change">All levels</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Quick Actions -->
+      <div class="section">
+        <h2>Quick Actions</h2>
+        <div class="quick-actions">
+          <a href="students/register.html" class="action-card">
+            <span class="action-icon">➕</span>
+            <span class="action-label">Register Student</span>
+          </a>
+          <a href="fees/payments.html" class="action-card">
+            <span class="action-icon">💳</span>
+            <span class="action-label">Record Payment</span>
+          </a>
+          <a href="communication/sms.html" class="action-card">
+            <span class="action-icon">📱</span>
+            <span class="action-label">Send SMS</span>
+          </a>
+          <a href="reports/dashboard.html" class="action-card">
+            <span class="action-icon">📊</span>
+            <span class="action-label">View Reports</span>
+          </a>
+        </div>
+      </div>
+      
+      <!-- Recent Activity -->
+      <div class="section">
+        <h2>Recent Activity</h2>
+        <div class="card">
+          <div class="activity-list" id="activityList">
+            <p class="text-muted">Loading recent activity...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, formatCurrency, showToast } from './js/config.js';
+    
+    // Check authentication
+    async function checkAuth() {
+      const user = await getCurrentUser();
+      if (!user) {
+        window.location.href = '/';
+        return null;
+      }
+      return user;
+    }
+    
+    // Load dashboard data
+    async function loadDashboard() {
+      const user = await checkAuth();
+      if (!user) return;
+      
+      // Update school name and user info
+      document.getElementById('schoolName').textContent = user.schools?.name || 'ScoTech SMS';
+      document.getElementById('userInfo').textContent = user.full_name || user.email;
+      
+      // Load statistics
+      await loadStatistics(user.school_id);
+    }
+    
+    // Load statistics
+    async function loadStatistics(schoolId) {
+      try {
+        // Total students
+        const { count: studentCount } = await supabase
+          .from('learners')
+          .select('*', { count: 'exact', head: true })
+          .eq('school_id', schoolId)
+          .eq('active', true);
+        
+        document.getElementById('totalStudents').textContent = studentCount || 0;
+        
+        // Total staff
+        const { count: staffCount } = await supabase
+          .from('staff')
+          .select('*', { count: 'exact', head: true })
+          .eq('school_id', schoolId)
+          .eq('active', true);
+        
+        document.getElementById('totalStaff').textContent = staffCount || 0;
+        
+        // Total classes
+        const { count: classCount } = await supabase
+          .from('classes')
+          .select('*', { count: 'exact', head: true })
+          .eq('school_id', schoolId);
+        
+        document.getElementById('totalClasses').textContent = classCount || 0;
+        
+        // Fee collection (current term)
+        const { data: term } = await supabase
+          .from('terms')
+          .select('id')
+          .eq('school_id', schoolId)
+          .eq('active', true)
+          .single();
+        
+        if (term) {
+          const { data: payments } = await supabase
+            .from('payments')
+            .select('amount')
+            .eq('school_id', schoolId)
+            .eq('term_id', term.id);
+          
+          const total = payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+          document.getElementById('feeCollection').textContent = formatCurrency(total);
+        }
+      } catch (error) {
+        console.error('Error loading statistics:', error);
+        showToast('Error loading dashboard data', 'error');
+      }
+    }
+    
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      if (confirm('Are you sure you want to logout?')) {
+        await supabase.auth.signOut();
+        window.location.href = '/';
+      }
+    });
+    
+    // Mobile menu toggle
+    document.getElementById('mobileMenuToggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+    });
+    
+    // Initialize
+    loadDashboard();
+  </script>
+</body>
+</html>
