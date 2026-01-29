@@ -439,8 +439,10 @@ CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
 -- VIEWS FOR COMMON QUERIES
 -- ========================================
 
--- View for learner fee summary
-CREATE OR REPLACE VIEW v_learner_fee_summary AS
+-- View for learner fee summary (SECURITY INVOKER - respects RLS)
+CREATE OR REPLACE VIEW v_learner_fee_summary 
+WITH (security_invoker = true)
+AS
 SELECT 
   l.id AS learner_id,
   l.school_id,
@@ -462,4 +464,4 @@ WHERE l.active = true
 GROUP BY l.id, l.school_id, l.admission_no, l.first_name, l.last_name, 
          c.name, t.year, t.term, cf.custom_amount, f.amount;
 
-COMMENT ON VIEW v_learner_fee_summary IS 'Fee summary for all active learners with balances';
+COMMENT ON VIEW v_learner_fee_summary IS 'Fee summary for all active learners with balances (SECURITY INVOKER - respects RLS policies)';
