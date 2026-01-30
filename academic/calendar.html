@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>School Calendar | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Academic</div>
+        <a href="subjects.html" class="nav-item active">
+          <span class="nav-icon">📚</span>
+          <span class="nav-text">Subjects</span>
+        </a>
+        <a href="classes.html" class="nav-item">
+          <span class="nav-icon">🎓</span>
+          <span class="nav-text">Classes</span>
+        </a>
+        <a href="timetable.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Timetable</span>
+        </a>
+        <a href="calendar.html" class="nav-item">
+          <span class="nav-icon">🗓️</span>
+          <span class="nav-text">Calendar</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <h1>School Calendar</h1>
+      <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Add Event Form -->
+      <div class="card">
+        <h2>Add Calendar Event</h2>
+        <form id="eventForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Event Title *</label>
+            <input type="text" id="eventTitle" required>
+          </div>
+          <div class="form-group">
+            <label>Event Type *</label>
+            <select id="eventType" required>
+              <option value="holiday">School Holiday</option>
+              <option value="exam">Examinations</option>
+              <option value="event">School Event</option>
+              <option value="meeting">Staff Meeting</option>
+              <option value="sports">Sports Day</option>
+              <option value="trip">Field Trip</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label>Start Date *</label>
+              <input type="date" id="startDate" required>
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="endDate">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="description" rows="3"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Event</button>
+        </form>
+      </div>
+      
+      <!-- Calendar View -->
+      <div class="card">
+        <h2>Upcoming Events</h2>
+        <div id="calendarView"></div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatDate } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadEvents();
+      setupEventListeners();
+    }
+    
+    async function loadEvents() {
+      const { data } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .gte('end_date', new Date().toISOString().split('T')[0])
+        .order('start_date');
+      
+      const container = document.getElementById('calendarView');
+      
+      if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-center text-muted">No upcoming events</p>';
+        return;
+      }
+      
+      const eventColors = {
+        holiday: '#f59e0b',
+        exam: '#ef4444',
+        event: '#8b5cf6',
+        meeting: '#3b82f6',
+        sports: '#10b981',
+        trip: '#06b6d4',
+        other: '#6b7280'
+      };
+      
+      container.innerHTML = data.map(event => `
+        <div style="padding: 16px; margin-bottom: 12px; border-left: 4px solid ${eventColors[event.event_type]}; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h4 style="margin: 0 0 8px 0;">${event.title}</h4>
+              <p style="margin: 0; color: var(--text-secondary);">
+                ${formatDate(event.start_date)}${event.end_date ? ' - ' + formatDate(event.end_date) : ''}
+              </p>
+              ${event.description ? `<p style="margin: 8px 0 0 0;">${event.description}</p>` : ''}
+            </div>
+            <button class="btn-icon" onclick="deleteEvent('${event.id}')" title="Delete">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('eventForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const eventData = {
+          school_id: currentUser.school_id,
+          title: document.getElementById('eventTitle').value.trim(),
+          event_type: document.getElementById('eventType').value,
+          start_date: document.getElementById('startDate').value,
+          end_date: document.getElementById('endDate').value || document.getElementById('startDate').value,
+          description: document.getElementById('description').value.trim() || null
+        };
+        
+        try {
+          const { error } = await supabase
+            .from('calendar_events')
+            .insert([eventData]);
+          
+          if (error) throw error;
+          
+          showToast('Event added successfully!', 'success');
+          document.getElementById('eventForm').reset();
+          await loadEvents();
+          
+        } catch (error) {
+          showToast('Error: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    window.deleteEvent = async function(eventId) {
+      if (!confirm('Delete this event?')) return;
+      
+      try {
+        await supabase.from('calendar_events').delete().eq('id', eventId);
+        showToast('Event deleted', 'success');
+        await loadEvents();
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
