@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fee Payments | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Fee Management</div>
+        <a href="setup.html" class="nav-item active">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Fee Setup</span>
+        </a>
+        <a href="custom.html" class="nav-item">
+          <span class="nav-icon">✏️</span>
+          <span class="nav-text">Custom Fees</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Payments</span>
+        </a>
+        <a href="receipts.html" class="nav-item">
+          <span class="nav-icon">🧾</span>
+          <span class="nav-text">Receipts</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Fee Payments</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+    
+    <!-- SEARCH LEARNER -->
+    <div class="card">
+      <h2>Search Learner</h2>
+      <p class="text-muted mb-20">Start typing to search for a learner</p>
+      <div class="autocomplete-container">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input-large"
+          placeholder="Start typing learner's name or admission number..." 
+          autocomplete="off"
+        />
+        <div id="autocompleteDropdown" class="autocomplete-dropdown hidden"></div>
+      </div>
+      <div id="learnerDetails" class="mt-20 hidden"></div>
+    </div>
+    
+    <!-- PAYMENT FORM -->
+    <div class="card hidden" id="paymentCard">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0;">Record Fee Payment</h2>
+        <button type="button" id="nextLearnerBtn" class="btn btn-secondary" style="width: auto;">
+          Next Learner →
+        </button>
+      </div>
+      <form id="paymentForm">
+        <input type="date" id="paymentDate" required />
+        <input type="text" id="referenceNo" placeholder="Reference No (optional)" />
+        <input type="number" id="amountPaid" placeholder="Amount Paid (KES)" min="1" required />
+        <button type="submit" id="paymentBtn">Save Payment</button>
+      </form>
+    </div>
+    
+    <!-- PAYMENT HISTORY -->
+    <div class="card hidden" id="historyCard">
+      <h2>Payment History</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Ref No</th>
+            <th>Amount (KES)</th>
+          </tr>
+        </thead>
+        <tbody id="paymentHistory"></tbody>
+      </table>
+    </div>
+  </div>
+  
+  <script type="module">
+  import { supabase, getCurrentUser, showToast, formatCurrency } from '../js/config.js';
+</script>
+</body>
+</html>
