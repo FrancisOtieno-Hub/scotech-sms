@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Profile | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Students</div>
+        <a href="register.html" class="nav-item">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">Add Student</span>
+        </a>
+        <a href="list.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Students</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1 id="studentName">Student Profile</h1>
+      </div>
+      <div class="topbar-right">
+        <a href="list.html" class="btn btn-sm btn-secondary">← Back to List</a>
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <div id="loadingDiv" class="text-center text-muted" style="padding: 40px;">Loading student profile...</div>
+      
+      <div id="profileContent" class="hidden">
+        <!-- Student Info Card -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 20px;">
+            <div style="display: flex; gap: 20px; align-items: start;">
+              <div>
+                <img id="studentPhoto" src="../assets/default-avatar.png" 
+                     style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid var(--primary);"
+                     onerror="this.src='../assets/default-avatar.png'">
+              </div>
+              <div>
+                <h2 id="fullName" style="margin-bottom: 8px;">-</h2>
+                <div style="display: flex; gap: 16px; flex-wrap: wrap; color: var(--text-secondary);">
+                  <span><strong>Adm No:</strong> <span id="admNo">-</span></span>
+                  <span><strong>Class:</strong> <span id="className">-</span></span>
+                  <span><strong>Gender:</strong> <span id="gender">-</span></span>
+                  <span id="statusBadge"></span>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px;">
+              <button class="btn btn-primary" onclick="editStudent()">✏️ Edit</button>
+              <button class="btn btn-secondary" onclick="printProfile()">🖨️ Print</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Details Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+          
+          <!-- Personal Information -->
+          <div class="card">
+            <h3 style="color: var(--primary); margin-bottom: 16px;">📋 Personal Information</h3>
+            <div style="display: grid; gap: 12px;">
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Date of Birth</div>
+                <div id="dob" style="font-weight: 600;">-</div>
+              </div>
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Age</div>
+                <div id="age" style="font-weight: 600;">-</div>
+              </div>
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Admission Date</div>
+                <div id="admissionDate" style="font-weight: 600;">-</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Parent Information -->
+          <div class="card">
+            <h3 style="color: var(--primary); margin-bottom: 16px;">👨‍👩‍👧 Parent/Guardian</h3>
+            <div style="display: grid; gap: 12px;">
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Name</div>
+                <div id="parentName" style="font-weight: 600;">-</div>
+              </div>
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Phone</div>
+                <div id="parentPhone" style="font-weight: 600;">-</div>
+              </div>
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Email</div>
+                <div id="parentEmail" style="font-weight: 600;">-</div>
+              </div>
+              <div>
+                <div class="text-muted" style="font-size: 0.85rem;">Address</div>
+                <div id="address" style="font-weight: 600;">-</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Medical Information -->
+          <div class="card">
+            <h3 style="color: var(--primary); margin-bottom: 16px;">🏥 Medical Information</h3>
+            <div id="medicalInfo" style="padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); min-height: 80px;">
+              -
+            </div>
+          </div>
+          
+        </div>
+        
+        <!-- Fee Summary -->
+        <div class="card">
+          <h3 style="color: var(--primary); margin-bottom: 16px;">💰 Fee Summary (Current Term)</h3>
+          <div id="feeSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+            <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+              <div class="text-muted" style="font-size: 0.85rem;">Total Fees</div>
+              <div id="totalFees" style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">-</div>
+            </div>
+            <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--success);">
+              <div class="text-muted" style="font-size: 0.85rem;">Amount Paid</div>
+              <div id="amountPaid" style="font-size: 1.5rem; font-weight: 700; color: var(--success);">-</div>
+            </div>
+            <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--danger);">
+              <div class="text-muted" style="font-size: 0.85rem;">Balance</div>
+              <div id="balance" style="font-size: 1.5rem; font-weight: 700; color: var(--danger);">-</div>
+            </div>
+          </div>
+          
+          <div id="customFeeNote" class="hidden" style="margin-top: 16px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: var(--radius-sm);">
+            <strong>ℹ️ Custom Fee:</strong> <span id="customFeeReason">-</span>
+          </div>
+        </div>
+        
+        <!-- Payment History -->
+        <div class="card">
+          <h3 style="color: var(--primary); margin-bottom: 16px;">📝 Payment History</h3>
+          <div id="noPayments" class="text-muted text-center hidden" style="padding: 20px;">No payments recorded yet</div>
+          <table class="data-table hidden" id="paymentsTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Reference No</th>
+                <th>Amount</th>
+                <th>Term</th>
+                <th>Received By</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsBody"></tbody>
+          </table>
+        </div>
+        
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatCurrency, formatDate } from '../js/config.js';
+    
+    let currentUser = null;
+    let studentData = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const studentId = urlParams.get('id');
+      
+      if (!studentId) {
+        showToast('No student ID provided', 'error');
+        setTimeout(() => window.location.href = 'list.html', 2000);
+        return;
+      }
+      
+      await loadStudentProfile(studentId);
+      setupEventListeners();
+    }
+    
+    async function loadStudentProfile(studentId) {
+      try {
+        // Get student with all related data
+        const { data: student, error: studentError } = await supabase
+          .from('learners')
+          .select(`
+            *,
+            classes(id, name, level)
+          `)
+          .eq('id', studentId)
+          .eq('school_id', currentUser.school_id)
+          .single();
+        
+        if (studentError) throw studentError;
+        
+        studentData = student;
+        
+        // Get active term
+        const { data: term } = await supabase
+          .from('terms')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .eq('active', true)
+          .maybeSingle();
+        
+        // Get fee information
+        let totalFees = 0;
+        let customFeeInfo = null;
+        
+        if (term) {
+          // Check for custom fee
+          const { data: customFee } = await supabase
+            .from('custom_fees')
+            .select('*')
+            .eq('learner_id', student.id)
+            .eq('term_id', term.id)
+            .maybeSingle();
+          
+          if (customFee) {
+            totalFees = Number(customFee.custom_amount);
+            customFeeInfo = customFee;
+          } else {
+            // Get class fee
+            const { data: fee } = await supabase
+              .from('fees')
+              .select('amount')
+              .eq('class_id', student.class_id)
+              .eq('term_id', term.id)
+              .maybeSingle();
+            
+            totalFees = fee?.amount || 0;
+          }
+        }
+        
+        // Get payments
+        const { data: payments } = await supabase
+          .from('payments')
+          .select(`
+            *,
+            terms(year, term),
+            user_profiles!received_by(full_name)
+          `)
+          .eq('learner_id', student.id)
+          .order('payment_date', { ascending: false });
+        
+        const totalPaid = payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+        const balance = totalFees - totalPaid;
+        
+        // Display everything
+        displayStudentInfo(student);
+        displayFeeSummary(totalFees, totalPaid, balance, customFeeInfo);
+        displayPaymentHistory(payments || []);
+        
+        document.getElementById('loadingDiv').classList.add('hidden');
+        document.getElementById('profileContent').classList.remove('hidden');
+        
+      } catch (error) {
+        showToast('Error loading student profile: ' + error.message, 'error');
+        setTimeout(() => window.location.href = 'list.html', 2000);
+      }
+    }
+    
+    function displayStudentInfo(student) {
+      document.getElementById('studentName').textContent = `${student.first_name} ${student.last_name}`;
+      document.getElementById('fullName').textContent = `${student.first_name} ${student.middle_name || ''} ${student.last_name}`;
+      document.getElementById('admNo').textContent = student.admission_no;
+      document.getElementById('className').textContent = student.classes?.name || 'N/A';
+      document.getElementById('gender').textContent = student.gender || 'N/A';
+      
+      // Status badge
+      const statusBadge = student.active 
+        ? '<span style="background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">✓ Active</span>'
+        : '<span style="background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">✗ Inactive</span>';
+      document.getElementById('statusBadge').innerHTML = statusBadge;
+      
+      // Personal info
+      if (student.date_of_birth) {
+        document.getElementById('dob').textContent = formatDate(student.date_of_birth);
+        const age = calculateAge(student.date_of_birth);
+        document.getElementById('age').textContent = `${age} years`;
+      }
+      
+      document.getElementById('admissionDate').textContent = formatDate(student.created_at);
+      
+      // Parent info
+      document.getElementById('parentName').textContent = student.parent_name || 'Not provided';
+      document.getElementById('parentPhone').textContent = student.parent_phone || 'Not provided';
+      document.getElementById('parentEmail').textContent = student.parent_email || 'Not provided';
+      document.getElementById('address').textContent = student.address || 'Not provided';
+      
+      // Medical info
+      document.getElementById('medicalInfo').textContent = student.medical_info || 'No medical information recorded';
+      
+      // Photo
+      if (student.photo_url) {
+        document.getElementById('studentPhoto').src = student.photo_url;
+      }
+    }
+    
+    function displayFeeSummary(totalFees, totalPaid, balance, customFeeInfo) {
+      document.getElementById('totalFees').textContent = formatCurrency(totalFees);
+      document.getElementById('amountPaid').textContent = formatCurrency(totalPaid);
+      document.getElementById('balance').textContent = formatCurrency(balance);
+      
+      // Update balance color
+      const balanceEl = document.getElementById('balance');
+      if (balance <= 0) {
+        balanceEl.style.color = 'var(--success)';
+      }
+      
+      // Show custom fee note if applicable
+      if (customFeeInfo) {
+        const feeTypeLabels = {
+          'full_sponsorship': 'Full Sponsorship',
+          'partial_sponsorship': 'Partial Sponsorship',
+          'custom_amount': 'Custom Fee Arrangement'
+        };
+        
+        const label = feeTypeLabels[customFeeInfo.fee_type] || 'Custom Fee';
+        const reason = customFeeInfo.reason ? ` - ${customFeeInfo.reason}` : '';
+        
+        document.getElementById('customFeeReason').textContent = label + reason;
+        document.getElementById('customFeeNote').classList.remove('hidden');
+      }
+    }
+    
+    function displayPaymentHistory(payments) {
+      if (payments.length === 0) {
+        document.getElementById('noPayments').classList.remove('hidden');
+        return;
+      }
+      
+      const tbody = document.getElementById('paymentsBody');
+      tbody.innerHTML = payments.map(payment => `
+        <tr>
+          <td>${formatDate(payment.payment_date)}</td>
+          <td>${payment.reference_no || '-'}</td>
+          <td style="font-weight: 600; color: var(--success);">${formatCurrency(payment.amount)}</td>
+          <td>${payment.terms ? `Year ${payment.terms.year} - Term ${payment.terms.term}` : '-'}</td>
+          <td>${payment.user_profiles?.full_name || '-'}</td>
+        </tr>
+      `).join('');
+      
+      document.getElementById('paymentsTable').classList.remove('hidden');
+    }
+    
+    function calculateAge(dateOfBirth) {
+      const today = new Date();
+      const birthDate = new Date(dateOfBirth);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      return age;
+    }
+    
+    window.editStudent = function() {
+      // Redirect to list page with edit modal
+      window.location.href = `list.html?edit=${studentData.id}`;
+    }
+    
+    window.printProfile = function() {
+      window.print();
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    init();
+  </script>
+</body>
+</html>
