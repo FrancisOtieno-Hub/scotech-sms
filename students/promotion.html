@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Promotion | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Students</div>
+        <a href="register.html" class="nav-item">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">Add Student</span>
+        </a>
+        <a href="list.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Students</span>
+        </a>
+        <a href="promotion.html" class="nav-item active">
+          <span class="nav-icon">⬆️</span>
+          <span class="nav-text">Promotion</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Class Promotion</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Instructions -->
+      <div class="card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+        <h2 style="color: white; margin-bottom: 12px;">📚 Class Promotion Instructions</h2>
+        <ul style="line-height: 1.8;">
+          <li>Select the current class to promote</li>
+          <li>Review the list of students in that class</li>
+          <li>Students will be promoted to the next class automatically</li>
+          <li>Grade 9 students will be marked as graduated</li>
+          <li><strong>Note:</strong> This action cannot be undone easily - use with care!</li>
+        </ul>
+      </div>
+      
+      <!-- Promotion Form -->
+      <div class="card">
+        <h2>Select Class to Promote</h2>
+        
+        <div class="form-group" style="max-width: 400px;">
+          <label>Current Class *</label>
+          <select id="currentClass" required>
+            <option value="">Select current class...</option>
+          </select>
+        </div>
+        
+        <button id="loadStudentsBtn" class="btn btn-primary" disabled>
+          👁️ Preview Students
+        </button>
+      </div>
+      
+      <!-- Preview Section -->
+      <div id="previewSection" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <h2 style="margin: 0;">Students in <span id="currentClassName">-</span></h2>
+            <p class="text-muted" style="margin-top: 8px;">
+              Will be promoted to: <strong id="nextClassInfo">-</strong>
+            </p>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button id="promoteBtn" class="btn btn-success">
+              ⬆️ Promote All (<span id="studentCount">0</span> students)
+            </button>
+            <button id="cancelBtn" class="btn btn-secondary">
+              Cancel
+            </button>
+          </div>
+        </div>
+        
+        <!-- Warning for Grade 9 -->
+        <div id="graduationWarning" class="hidden" style="padding: 16px; background: #fff3cd; border: 2px solid #ffc107; border-radius: var(--radius-sm); margin-bottom: 20px;">
+          <h4 style="color: #856404; margin-bottom: 8px;">⚠️ Graduation Notice</h4>
+          <p style="margin: 0; color: #856404;">
+            Grade 9 students will be marked as <strong>graduated</strong> and moved to inactive status. 
+            They will no longer appear in the active students list.
+          </p>
+        </div>
+        
+        <!-- Students Table -->
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="studentsTable">
+            <thead>
+              <tr>
+                <th>Adm No</th>
+                <th>Name</th>
+                <th>Gender</th>
+                <th>Parent Phone</th>
+                <th>Current Class</th>
+                <th>Next Class</th>
+              </tr>
+            </thead>
+            <tbody id="studentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Success Section -->
+      <div id="successSection" class="card hidden" style="background: var(--success); color: white; text-align: center; padding: 40px;">
+        <h2 style="color: white;">✅ Promotion Successful!</h2>
+        <p style="font-size: 1.2rem; margin: 20px 0;">
+          <span id="promotedCount">0</span> students have been promoted successfully
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <a href="list.html" class="btn" style="background: white; color: var(--success);">View All Students</a>
+          <button id="promoteMoreBtn" class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid white;">
+            Promote Another Class
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading } from '../js/config.js';
+    
+    let currentUser = null;
+    let classes = [];
+    let studentsToPromote = [];
+    let selectedClass = null;
+    let nextClass = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadClasses();
+      setupEventListeners();
+    }
+    
+    async function loadClasses() {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      classes = data || [];
+      
+      const select = document.getElementById('currentClass');
+      classes.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        option.dataset.level = cls.level;
+        select.appendChild(option);
+      });
+    }
+    
+    function setupEventListeners() {
+      // Current class change
+      document.getElementById('currentClass').addEventListener('change', (e) => {
+        document.getElementById('loadStudentsBtn').disabled = !e.target.value;
+      });
+      
+      // Load students button
+      document.getElementById('loadStudentsBtn').addEventListener('click', loadStudents);
+      
+      // Promote button
+      document.getElementById('promoteBtn').addEventListener('click', promoteStudents);
+      
+      // Cancel button
+      document.getElementById('cancelBtn').addEventListener('click', () => {
+        document.getElementById('previewSection').classList.add('hidden');
+        studentsToPromote = [];
+      });
+      
+      // Promote more button
+      document.getElementById('promoteMoreBtn').addEventListener('click', () => {
+        document.getElementById('successSection').classList.add('hidden');
+        document.getElementById('currentClass').value = '';
+        document.getElementById('loadStudentsBtn').disabled = true;
+      });
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    async function loadStudents() {
+      const classId = document.getElementById('currentClass').value;
+      if (!classId) return;
+      
+      const select = document.getElementById('currentClass');
+      const selectedOption = select.options[select.selectedIndex];
+      const currentLevel = parseInt(selectedOption.dataset.level);
+      
+      selectedClass = classes.find(c => c.id === classId);
+      
+      // Determine next class
+      if (currentLevel === 9) {
+        // Grade 9 - will graduate
+        nextClass = null;
+        document.getElementById('nextClassInfo').innerHTML = '<span style="color: var(--warning);">Graduated ✓</span>';
+        document.getElementById('graduationWarning').classList.remove('hidden');
+      } else {
+        // Find next class
+        nextClass = classes.find(c => c.level === currentLevel + 1);
+        if (nextClass) {
+          document.getElementById('nextClassInfo').textContent = nextClass.name;
+        } else {
+          document.getElementById('nextClassInfo').innerHTML = '<span style="color: var(--danger);">No next class configured</span>';
+        }
+        document.getElementById('graduationWarning').classList.add('hidden');
+      }
+      
+      try {
+        // Fetch students
+        const { data: students, error } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .eq('class_id', classId)
+          .eq('active', true)
+          .order('first_name');
+        
+        if (error) throw error;
+        
+        if (!students || students.length === 0) {
+          showToast('No active students found in this class', 'warning');
+          return;
+        }
+        
+        studentsToPromote = students;
+        displayStudents(students);
+        
+        document.getElementById('currentClassName').textContent = selectedClass.name;
+        document.getElementById('studentCount').textContent = students.length;
+        document.getElementById('previewSection').classList.remove('hidden');
+        
+      } catch (error) {
+        showToast('Error loading students: ' + error.message, 'error');
+      }
+    }
+    
+    function displayStudents(students) {
+      const tbody = document.getElementById('studentsBody');
+      const nextClassName = nextClass ? nextClass.name : '<span style="color: var(--warning);">Graduated</span>';
+      
+      tbody.innerHTML = students.map(student => `
+        <tr>
+          <td>${student.admission_no}</td>
+          <td><strong>${student.first_name} ${student.last_name}</strong></td>
+          <td>${student.gender || '-'}</td>
+          <td>${student.parent_phone || '-'}</td>
+          <td>${selectedClass.name}</td>
+          <td>${nextClassName}</td>
+        </tr>
+      `).join('');
+    }
+    
+    async function promoteStudents() {
+      if (studentsToPromote.length === 0) return;
+      
+      const select = document.getElementById('currentClass');
+      const selectedOption = select.options[select.selectedIndex];
+      const currentLevel = parseInt(selectedOption.dataset.level);
+      
+      let confirmMessage = '';
+      if (currentLevel === 9) {
+        confirmMessage = `Graduate ${studentsToPromote.length} Grade 9 students?\n\n` +
+                         `They will be marked as graduated and moved to inactive status.\n\n` +
+                         `This action cannot be easily undone!`;
+      } else if (!nextClass) {
+        showToast('No next class available for promotion', 'error');
+        return;
+      } else {
+        confirmMessage = `Promote ${studentsToPromote.length} students from ${selectedClass.name} to ${nextClass.name}?\n\n` +
+                         `This action cannot be easily undone!`;
+      }
+      
+      const confirmed = confirm(confirmMessage);
+      if (!confirmed) return;
+      
+      const promoteBtn = document.getElementById('promoteBtn');
+      setButtonLoading(promoteBtn, true, 'Promoting...');
+      
+      try {
+        let updateData = {};
+        
+        if (currentLevel === 9) {
+          // Graduate students
+          updateData = {
+            active: false,
+            graduated: true,
+            graduation_date: new Date().toISOString().split('T')[0]
+          };
+        } else {
+          // Promote to next class
+          updateData = {
+            class_id: nextClass.id
+          };
+        }
+        
+        // Update all students
+        const { error } = await supabase
+          .from('learners')
+          .update(updateData)
+          .in('id', studentsToPromote.map(s => s.id));
+        
+        if (error) throw error;
+        
+        // Show success
+        document.getElementById('promotedCount').textContent = studentsToPromote.length;
+        document.getElementById('previewSection').classList.add('hidden');
+        document.getElementById('successSection').classList.remove('hidden');
+        
+        const action = currentLevel === 9 ? 'graduated' : 'promoted';
+        showToast(`Successfully ${action} ${studentsToPromote.length} students!`, 'success');
+        
+      } catch (error) {
+        showToast('Error promoting students: ' + error.message, 'error');
+      } finally {
+        setButtonLoading(promoteBtn, false, `⬆️ Promote All (${studentsToPromote.length} students)`);
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
