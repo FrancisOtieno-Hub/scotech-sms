@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expense Tracking | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Finance</div>
+        <a href="expenses.html" class="nav-item active">
+          <span class="nav-icon">💸</span>
+          <span class="nav-text">Expenses</span>
+        </a>
+        <a href="categories.html" class="nav-item">
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Categories</span>
+        </a>
+        <a href="budget.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Budget</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Expense Tracking</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Monthly Summary -->
+      <div id="monthlySummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 24px;"></div>
+      
+      <!-- Add Expense Form -->
+      <div class="card">
+        <h2>Record New Expense</h2>
+        
+        <form id="expenseForm" style="max-width: 800px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>Expense Date *</label>
+              <input type="date" id="expenseDate" required>
+            </div>
+            
+            <div class="form-group">
+              <label>Category *</label>
+              <select id="categoryId" required>
+                <option value="">Select Category</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>Amount (KES) *</label>
+              <input type="number" id="amount" min="0" step="0.01" required placeholder="0.00">
+            </div>
+            
+            <div class="form-group">
+              <label>Payment Method *</label>
+              <select id="paymentMethod" required>
+                <option value="">Select Method</option>
+                <option value="cash">Cash</option>
+                <option value="mpesa">M-Pesa</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            <div class="form-group">
+              <label>Vendor/Supplier</label>
+              <input type="text" id="vendor" placeholder="e.g., ABC Suppliers Ltd">
+            </div>
+            
+            <div class="form-group">
+              <label>Receipt/Invoice Number</label>
+              <input type="text" id="receiptNo" placeholder="e.g., INV-2026-001">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Description *</label>
+            <textarea id="description" rows="3" required placeholder="What was this expense for?"></textarea>
+          </div>
+          
+          <button type="submit" id="saveBtn" class="btn btn-primary">Record Expense</button>
+        </form>
+      </div>
+      
+      <!-- Expenses List -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <h2 style="margin: 0;">Recent Expenses</h2>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <select id="categoryFilter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+              <option value="">All Categories</option>
+            </select>
+            <select id="monthFilter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+              <option value="">All Time</option>
+              <option value="current">This Month</option>
+              <option value="last">Last Month</option>
+            </select>
+            <select id="statusFilter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+              <option value="">All Status</option>
+              <option value="pending">Pending Approval</option>
+              <option value="approved">Approved</option>
+            </select>
+          </div>
+        </div>
+        
+        <table class="data-table" id="expensesTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Vendor</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="expensesBody">
+            <tr><td colspan="7" class="text-center text-muted">Loading expenses...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Approval Modal -->
+  <div id="approvalModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 500px; width: 90%;">
+      <h2>Expense Details</h2>
+      <div id="expenseDetails" style="margin: 20px 0;"></div>
+      <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <button id="approveBtn" class="btn btn-success">✓ Approve</button>
+        <button id="rejectBtn" class="btn btn-danger">✗ Reject</button>
+        <button class="btn btn-secondary" onclick="closeApprovalModal()">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, formatCurrency, formatDate } from '../js/config.js';
+    
+    let currentUser = null;
+    let selectedExpenseId = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      // Set default date to today
+      document.getElementById('expenseDate').valueAsDate = new Date();
+      
+      await loadCategories();
+      await loadMonthlySummary();
+      await loadExpenses();
+      setupEventListeners();
+    }
+    
+    async function loadCategories() {
+      const { data } = await supabase
+        .from('expense_categories')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('name');
+      
+      const selects = [document.getElementById('categoryId'), document.getElementById('categoryFilter')];
+      
+      selects.forEach(select => {
+        data?.forEach(cat => {
+          const option = document.createElement('option');
+          option.value = cat.id;
+          option.textContent = cat.name;
+          select.appendChild(option);
+        });
+      });
+    }
+    
+    async function loadMonthlySummary() {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('amount, status')
+        .eq('school_id', currentUser.school_id)
+        .gte('expense_date', firstDay)
+        .lte('expense_date', lastDay);
+      
+      const total = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const approved = expenses?.filter(e => e.status === 'approved').reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const pending = expenses?.filter(e => e.status === 'pending').reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      
+      document.getElementById('monthlySummary').innerHTML = `
+        <div style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9;">Total Expenses (This Month)</div>
+          <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">${formatCurrency(total)}</div>
+          <div style="font-size: 0.85rem; opacity: 0.8;">${expenses?.length || 0} transactions</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9;">Approved Expenses</div>
+          <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">${formatCurrency(approved)}</div>
+          <div style="font-size: 0.85rem; opacity: 0.8;">Processed</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9;">Pending Approval</div>
+          <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">${formatCurrency(pending)}</div>
+          <div style="font-size: 0.85rem; opacity: 0.8;">Awaiting review</div>
+        </div>
+      `;
+    }
+    
+    async function loadExpenses() {
+      try {
+        let query = supabase
+          .from('expenses')
+          .select(`
+            *,
+            expense_categories(name),
+            user_profiles!recorded_by(full_name)
+          `)
+          .eq('school_id', currentUser.school_id)
+          .order('expense_date', { ascending: false })
+          .limit(100);
+        
+        // Apply filters
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        if (categoryFilter) {
+          query = query.eq('category_id', categoryFilter);
+        }
+        
+        const monthFilter = document.getElementById('monthFilter').value;
+        if (monthFilter === 'current') {
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+          query = query.gte('expense_date', firstDay);
+        } else if (monthFilter === 'last') {
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+          const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+          query = query.gte('expense_date', firstDay).lte('expense_date', lastDay);
+        }
+        
+        const statusFilter = document.getElementById('statusFilter').value;
+        if (statusFilter) {
+          query = query.eq('status', statusFilter);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        const tbody = document.getElementById('expensesBody');
+        
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No expenses found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = data.map(expense => {
+          const statusBadge = expense.status === 'approved' 
+            ? '<span style="background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">✓ Approved</span>'
+            : '<span style="background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">⏳ Pending</span>';
+          
+          return `
+            <tr>
+              <td>${formatDate(expense.expense_date)}</td>
+              <td>${expense.expense_categories?.name || '-'}</td>
+              <td>${expense.description}</td>
+              <td>${expense.vendor || '-'}</td>
+              <td style="font-weight: 600; color: var(--danger);">${formatCurrency(expense.amount)}</td>
+              <td>${statusBadge}</td>
+              <td>
+                <div class="action-buttons">
+                  ${expense.status === 'pending' 
+                    ? `<button class="btn-icon" onclick="viewExpense('${expense.id}')" title="Review">👁️</button>`
+                    : '<span class="text-muted">-</span>'}
+                  <button class="btn-icon" onclick="deleteExpense('${expense.id}')" title="Delete">🗑️</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+        
+      } catch (error) {
+        showToast('Error loading expenses: ' + error.message, 'error');
+      }
+    }
+    
+    function setupEventListeners() {
+      // Add expense form
+      document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const expenseData = {
+          school_id: currentUser.school_id,
+          category_id: document.getElementById('categoryId').value,
+          expense_date: document.getElementById('expenseDate').value,
+          amount: parseFloat(document.getElementById('amount').value),
+          payment_method: document.getElementById('paymentMethod').value,
+          vendor: document.getElementById('vendor').value.trim() || null,
+          receipt_no: document.getElementById('receiptNo').value.trim() || null,
+          description: document.getElementById('description').value.trim(),
+          recorded_by: currentUser.id,
+          status: 'pending'
+        };
+        
+        const saveBtn = document.getElementById('saveBtn');
+        setButtonLoading(saveBtn, true, 'Saving...');
+        
+        try {
+          const { error } = await supabase
+            .from('expenses')
+            .insert([expenseData]);
+          
+          if (error) throw error;
+          
+          showToast('✓ Expense recorded successfully!', 'success');
+          document.getElementById('expenseForm').reset();
+          document.getElementById('expenseDate').valueAsDate = new Date();
+          
+          await loadMonthlySummary();
+          await loadExpenses();
+          
+        } catch (error) {
+          showToast('Error recording expense: ' + error.message, 'error');
+        } finally {
+          setButtonLoading(saveBtn, false, 'Record Expense');
+        }
+      });
+      
+      // Filters
+      ['categoryFilter', 'monthFilter', 'statusFilter'].forEach(id => {
+        document.getElementById(id).addEventListener('change', loadExpenses);
+      });
+      
+      // Approval buttons
+      document.getElementById('approveBtn').addEventListener('click', () => approveExpense(true));
+      document.getElementById('rejectBtn').addEventListener('click', () => approveExpense(false));
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    window.viewExpense = async function(expenseId) {
+      selectedExpenseId = expenseId;
+      
+      const { data } = await supabase
+        .from('expenses')
+        .select(`
+          *,
+          expense_categories(name),
+          user_profiles!recorded_by(full_name)
+        `)
+        .eq('id', expenseId)
+        .single();
+      
+      if (data) {
+        document.getElementById('expenseDetails').innerHTML = `
+          <div style="display: grid; gap: 12px;">
+            <div><strong>Date:</strong> ${formatDate(data.expense_date)}</div>
+            <div><strong>Category:</strong> ${data.expense_categories?.name}</div>
+            <div><strong>Amount:</strong> <span style="font-size: 1.5rem; color: var(--danger);">${formatCurrency(data.amount)}</span></div>
+            <div><strong>Payment Method:</strong> ${data.payment_method}</div>
+            <div><strong>Vendor:</strong> ${data.vendor || '-'}</div>
+            <div><strong>Receipt No:</strong> ${data.receipt_no || '-'}</div>
+            <div><strong>Description:</strong> ${data.description}</div>
+            <div><strong>Recorded By:</strong> ${data.user_profiles?.full_name}</div>
+          </div>
+        `;
+        
+        document.getElementById('approvalModal').classList.remove('hidden');
+      }
+    }
+    
+    async function approveExpense(approve) {
+      try {
+        const { error } = await supabase
+          .from('expenses')
+          .update({
+            status: approve ? 'approved' : 'rejected',
+            approved_by: currentUser.id
+          })
+          .eq('id', selectedExpenseId);
+        
+        if (error) throw error;
+        
+        showToast(approve ? 'Expense approved!' : 'Expense rejected', 'success');
+        closeApprovalModal();
+        
+        await loadMonthlySummary();
+        await loadExpenses();
+        
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+    }
+    
+    window.deleteExpense = async function(expenseId) {
+      if (!confirm('Delete this expense record?')) return;
+      
+      try {
+        const { error } = await supabase
+          .from('expenses')
+          .delete()
+          .eq('id', expenseId);
+        
+        if (error) throw error;
+        
+        showToast('Expense deleted', 'success');
+        await loadMonthlySummary();
+        await loadExpenses();
+        
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+    }
+    
+    window.closeApprovalModal = function() {
+      document.getElementById('approvalModal').classList.add('hidden');
+      selectedExpenseId = null;
+    }
+    
+    init();
+  </script>
+</body>
+</html>
