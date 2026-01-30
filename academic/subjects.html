@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subject Management | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Academic</div>
+        <a href="subjects.html" class="nav-item active">
+          <span class="nav-icon">📚</span>
+          <span class="nav-text">Subjects</span>
+        </a>
+        <a href="classes.html" class="nav-item">
+          <span class="nav-icon">🎓</span>
+          <span class="nav-text">Classes</span>
+        </a>
+        <a href="timetable.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Timetable</span>
+        </a>
+        <a href="calendar.html" class="nav-item">
+          <span class="nav-icon">🗓️</span>
+          <span class="nav-text">Calendar</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Subject Management</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Add Subject Form -->
+      <div class="card">
+        <h2>Add New Subject</h2>
+        
+        <form id="subjectForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Subject Name *</label>
+            <input type="text" id="subjectName" placeholder="e.g., Mathematics" required>
+          </div>
+          
+          <div class="form-group">
+            <label>Subject Code *</label>
+            <input type="text" id="subjectCode" placeholder="e.g., MAT" required maxlength="10" style="text-transform: uppercase;">
+            <small class="text-muted">Short code for the subject (e.g., MAT, ENG, SCI)</small>
+          </div>
+          
+          <div class="form-group">
+            <label>Department</label>
+            <select id="departmentId">
+              <option value="">Select Department</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="description" rows="3" placeholder="Brief description of the subject..."></textarea>
+          </div>
+          
+          <button type="submit" id="saveBtn" class="btn btn-primary">Add Subject</button>
+        </form>
+      </div>
+      
+      <!-- Subjects List -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0;">All Subjects (<span id="subjectCount">0</span>)</h2>
+          <div style="display: flex; gap: 12px;">
+            <select id="deptFilter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+              <option value="">All Departments</option>
+            </select>
+          </div>
+        </div>
+        
+        <table class="data-table" id="subjectsTable">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Subject Name</th>
+              <th>Department</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="subjectsBody">
+            <tr><td colspan="5" class="text-center text-muted">Loading subjects...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 500px; width: 90%;">
+      <h2>Edit Subject</h2>
+      <form id="editForm">
+        <input type="hidden" id="editSubjectId">
+        <div class="form-group">
+          <label>Subject Name</label>
+          <input type="text" id="editName" required>
+        </div>
+        <div class="form-group">
+          <label>Subject Code</label>
+          <input type="text" id="editCode" required maxlength="10" style="text-transform: uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select id="editDepartment"></select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="editDescription" rows="3"></textarea>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadDepartments();
+      await loadSubjects();
+      setupEventListeners();
+    }
+    
+    async function loadDepartments() {
+      const { data } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('name');
+      
+      const selects = [
+        document.getElementById('departmentId'),
+        document.getElementById('editDepartment'),
+        document.getElementById('deptFilter')
+      ];
+      
+      selects.forEach(select => {
+        if (select.id !== 'deptFilter') select.innerHTML = '<option value="">No Department</option>';
+        
+        data?.forEach(dept => {
+          const option = document.createElement('option');
+          option.value = dept.id;
+          option.textContent = dept.name;
+          select.appendChild(option);
+        });
+      });
+    }
+    
+    async function loadSubjects(deptFilter = null) {
+      try {
+        let query = supabase
+          .from('subjects')
+          .select('*, departments(name)')
+          .eq('school_id', currentUser.school_id)
+          .order('code');
+        
+        if (deptFilter) {
+          query = query.eq('department_id', deptFilter);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        const tbody = document.getElementById('subjectsBody');
+        document.getElementById('subjectCount').textContent = data?.length || 0;
+        
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No subjects found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = data.map(subject => `
+          <tr>
+            <td><strong>${subject.code}</strong></td>
+            <td>${subject.name}</td>
+            <td>${subject.departments?.name || '-'}</td>
+            <td>${subject.description || '-'}</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn-icon" onclick="editSubject('${subject.id}')" title="Edit">✏️</button>
+                <button class="btn-icon" onclick="deleteSubject('${subject.id}', '${subject.name}')" title="Delete">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+        
+      } catch (error) {
+        showToast('Error loading subjects: ' + error.message, 'error');
+      }
+    }
+    
+    function setupEventListeners() {
+      // Add subject form
+      document.getElementById('subjectForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const subjectData = {
+          school_id: currentUser.school_id,
+          name: document.getElementById('subjectName').value.trim(),
+          code: document.getElementById('subjectCode').value.trim().toUpperCase(),
+          department_id: document.getElementById('departmentId').value || null,
+          description: document.getElementById('description').value.trim() || null
+        };
+        
+        const saveBtn = document.getElementById('saveBtn');
+        setButtonLoading(saveBtn, true, 'Saving...');
+        
+        try {
+          const { error } = await supabase
+            .from('subjects')
+            .insert([subjectData]);
+          
+          if (error) throw error;
+          
+          showToast(`✓ ${subjectData.name} added successfully!`, 'success');
+          document.getElementById('subjectForm').reset();
+          await loadSubjects();
+          
+        } catch (error) {
+          if (error.code === '23505') {
+            showToast('Subject code already exists', 'error');
+          } else {
+            showToast('Error adding subject: ' + error.message, 'error');
+          }
+        } finally {
+          setButtonLoading(saveBtn, false, 'Add Subject');
+        }
+      });
+      
+      // Edit form
+      document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const updates = {
+          name: document.getElementById('editName').value.trim(),
+          code: document.getElementById('editCode').value.trim().toUpperCase(),
+          department_id: document.getElementById('editDepartment').value || null,
+          description: document.getElementById('editDescription').value.trim() || null
+        };
+        
+        try {
+          const { error } = await supabase
+            .from('subjects')
+            .update(updates)
+            .eq('id', document.getElementById('editSubjectId').value);
+          
+          if (error) throw error;
+          
+          showToast('Subject updated successfully!', 'success');
+          closeEditModal();
+          await loadSubjects();
+          
+        } catch (error) {
+          showToast('Error updating subject: ' + error.message, 'error');
+        }
+      });
+      
+      // Department filter
+      document.getElementById('deptFilter').addEventListener('change', (e) => {
+        loadSubjects(e.target.value || null);
+      });
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    window.editSubject = async function(subjectId) {
+      const { data } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('id', subjectId)
+        .single();
+      
+      if (data) {
+        document.getElementById('editSubjectId').value = data.id;
+        document.getElementById('editName').value = data.name;
+        document.getElementById('editCode').value = data.code;
+        document.getElementById('editDepartment').value = data.department_id || '';
+        document.getElementById('editDescription').value = data.description || '';
+        document.getElementById('editModal').classList.remove('hidden');
+      }
+    }
+    
+    window.deleteSubject = async function(subjectId, subjectName) {
+      if (!confirm(`Delete ${subjectName}?\n\nThis will also remove it from all timetables.`)) return;
+      
+      try {
+        const { error } = await supabase
+          .from('subjects')
+          .delete()
+          .eq('id', subjectId);
+        
+        if (error) throw error;
+        
+        showToast(`${subjectName} deleted successfully`, 'success');
+        await loadSubjects();
+        
+      } catch (error) {
+        showToast('Error deleting subject: ' + error.message, 'error');
+      }
+    }
+    
+    window.closeEditModal = function() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+    
+    init();
+  </script>
+</body>
+</html>
