@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Expense Categories | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Finance</div>
+        <a href="expenses.html" class="nav-item active">
+          <span class="nav-icon">💸</span>
+          <span class="nav-text">Expenses</span>
+        </a>
+        <a href="categories.html" class="nav-item">
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Categories</span>
+        </a>
+        <a href="budget.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Budget</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <h1>Expense Categories</h1>
+      <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Add Category Form -->
+      <div class="card">
+        <h2>Add New Category</h2>
+        <form id="categoryForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Category Name *</label>
+            <input type="text" id="categoryName" placeholder="e.g., Office Supplies" required>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="description" rows="3" placeholder="Brief description of this category..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Category</button>
+        </form>
+      </div>
+      
+      <!-- Categories List -->
+      <div class="card">
+        <h2>All Categories</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Category Name</th>
+              <th>Description</th>
+              <th>Total Spent (This Month)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="categoriesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatCurrency } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadCategories();
+      setupEventListeners();
+    }
+    
+    async function loadCategories() {
+      // Get categories with monthly spending
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      
+      const { data: categories } = await supabase
+        .from('expense_categories')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('name');
+      
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('category_id, amount')
+        .eq('school_id', currentUser.school_id)
+        .eq('status', 'approved')
+        .gte('expense_date', firstDay);
+      
+      // Calculate spending per category
+      const spending = {};
+      expenses?.forEach(e => {
+        spending[e.category_id] = (spending[e.category_id] || 0) + Number(e.amount);
+      });
+      
+      const tbody = document.getElementById('categoriesBody');
+      
+      tbody.innerHTML = categories?.map(cat => `
+        <tr>
+          <td><strong>${cat.name}</strong></td>
+          <td>${cat.description || '-'}</td>
+          <td style="font-weight: 600; color: var(--danger);">${formatCurrency(spending[cat.id] || 0)}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-icon" onclick="editCategory('${cat.id}')" title="Edit">✏️</button>
+              <button class="btn-icon" onclick="deleteCategory('${cat.id}', '${cat.name}')" title="Delete">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="text-center text-muted">No categories found</td></tr>';
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const categoryData = {
+          school_id: currentUser.school_id,
+          name: document.getElementById('categoryName').value.trim(),
+          description: document.getElementById('description').value.trim() || null
+        };
+        
+        try {
+          const { error } = await supabase
+            .from('expense_categories')
+            .insert([categoryData]);
+          
+          if (error) throw error;
+          
+          showToast('Category added successfully!', 'success');
+          document.getElementById('categoryForm').reset();
+          await loadCategories();
+          
+        } catch (error) {
+          showToast('Error: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    window.editCategory = async function(categoryId) {
+      // Show modal, edit category
+    }
+    
+    window.deleteCategory = async function(categoryId, categoryName) {
+      if (!confirm(`Delete ${categoryName}?`)) return;
+      
+      try {
+        await supabase.from('expense_categories').delete().eq('id', categoryId);
+        showToast('Category deleted', 'success');
+        await loadCategories();
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
