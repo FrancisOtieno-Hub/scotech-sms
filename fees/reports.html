@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fee Reports | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Fee Management</div>
+        <a href="setup.html" class="nav-item active">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Fee Setup</span>
+        </a>
+        <a href="custom.html" class="nav-item">
+          <span class="nav-icon">✏️</span>
+          <span class="nav-text">Custom Fees</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Payments</span>
+        </a>
+        <a href="receipts.html" class="nav-item">
+          <span class="nav-icon">🧾</span>
+          <span class="nav-text">Receipts</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Fee Reports & Analytics</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨️ Print Report</button>
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Filters -->
+      <div class="card">
+        <h2>Report Filters</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label>Term</label>
+            <select id="termFilter">
+              <option value="">All Terms</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Class</label>
+            <select id="classFilter">
+              <option value="">All Classes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Report Type</label>
+            <select id="reportType">
+              <option value="summary">Summary Report</option>
+              <option value="detailed">Detailed Report</option>
+              <option value="defaulters">Fee Defaulters</option>
+              <option value="cleared">Fully Paid Students</option>
+            </select>
+          </div>
+          <div style="display: flex; align-items: end;">
+            <button class="btn btn-primary btn-block" id="generateBtn">Generate Report</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Summary Stats -->
+      <div id="summaryStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <!-- Stats cards will be inserted here -->
+      </div>
+      
+      <!-- Report Content -->
+      <div class="card">
+        <h2 id="reportTitle">Fee Collection Summary</h2>
+        <div id="reportContent">
+          <p class="text-center text-muted" style="padding: 40px;">
+            Select filters and click "Generate Report" to view fee analytics
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatCurrency } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadFilters();
+      setupEventListeners();
+    }
+    
+    async function loadFilters() {
+      // Load terms
+      const { data: terms } = await supabase
+        .from('terms')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('year', { ascending: false });
+      
+      const termSelect = document.getElementById('termFilter');
+      terms?.forEach(term => {
+        const option = document.createElement('option');
+        option.value = term.id;
+        option.textContent = `Year ${term.year} - Term ${term.term}`;
+        if (term.active) option.selected = true;
+        termSelect.appendChild(option);
+      });
+      
+      // Load classes
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const classSelect = document.getElementById('classFilter');
+      classes?.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        classSelect.appendChild(option);
+      });
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('generateBtn').addEventListener('click', generateReport);
+      
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+    }
+    
+    async function generateReport() {
+      const termId = document.getElementById('termFilter').value;
+      const classId = document.getElementById('classFilter').value;
+      const reportType = document.getElementById('reportType').value;
+      
+      if (!termId) {
+        showToast('Please select a term', 'error');
+        return;
+      }
+      
+      try {
+        // Get fee summary using the view
+        let query = supabase
+          .from('v_learner_fee_summary')
+          .select('*')
+          .eq('school_id', currentUser.school_id);
+        
+        if (classId) {
+          query = query.eq('class_name', (await supabase.from('classes').select('name').eq('id', classId).single()).data.name);
+        }
+        
+        const { data: feeSummary } = await query;
+        
+        // Calculate totals
+        const totalExpected = feeSummary?.reduce((sum, s) => sum + Number(s.total_fees), 0) || 0;
+        const totalCollected = feeSummary?.reduce((sum, s) => sum + Number(s.total_paid), 0) || 0;
+        const totalBalance = totalExpected - totalCollected;
+        const collectionRate = totalExpected > 0 ? (totalCollected / totalExpected * 100).toFixed(1) : 0;
+        
+        // Display stats
+        displayStats(totalExpected, totalCollected, totalBalance, collectionRate, feeSummary?.length || 0);
+        
+        // Display report based on type
+        if (reportType === 'summary') {
+          displaySummaryReport(feeSummary);
+        } else if (reportType === 'detailed') {
+          displayDetailedReport(feeSummary);
+        } else if (reportType === 'defaulters') {
+          displayDefaultersReport(feeSummary?.filter(s => Number(s.balance) > 0));
+        } else if (reportType === 'cleared') {
+          displayClearedReport(feeSummary?.filter(s => Number(s.balance) <= 0));
+        }
+        
+      } catch (error) {
+        showToast('Error generating report: ' + error.message, 'error');
+      }
+    }
+    
+    function displayStats(expected, collected, balance, rate, studentCount) {
+      document.getElementById('summaryStats').innerHTML = `
+        <div style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9;">Total Expected</div>
+          <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">${formatCurrency(expected)}</div>
+          <div style="font-size: 0.85rem; opacity: 0.8;">${studentCount} students</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9;">Total Collected</div>
+          <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">${formatCurrency(collected)}</div>
+          <div style="font-size: 0.85rem; opacity: 0.8;">${rate}% collection rate</div>
+        </div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: var(--radius-sm); color: white;">
+          <div style="font-size: 0.9rem; opacity: 0.9;">Outstanding Balance</div>
+          <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">${formatCurrency(balance)}</div>
+          <div style="font-size: 0.85rem; opacity: 0.8;">To be collected</div>
+        </div>
+      `;
+    }
+    
+    function displaySummaryReport(data) {
+      if (!data || data.length === 0) {
+        document.getElementById('reportContent').innerHTML = '<p class="text-center text-muted" style="padding: 40px;">No data available</p>';
+        return;
+      }
+      
+      document.getElementById('reportTitle').textContent = 'Fee Collection Summary by Class';
+      
+      // Group by class
+      const byClass = {};
+      data.forEach(s => {
+        if (!byClass[s.class_name]) {
+          byClass[s.class_name] = { count: 0, expected: 0, collected: 0 };
+        }
+        byClass[s.class_name].count++;
+        byClass[s.class_name].expected += Number(s.total_fees);
+        byClass[s.class_name].collected += Number(s.total_paid);
+      });
+      
+      const html = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Students</th>
+              <th>Expected</th>
+              <th>Collected</th>
+              <th>Balance</th>
+              <th>Collection %</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(byClass).map(([className, stats]) => {
+              const balance = stats.expected - stats.collected;
+              const rate = stats.expected > 0 ? (stats.collected / stats.expected * 100).toFixed(1) : 0;
+              return `
+                <tr>
+                  <td><strong>${className}</strong></td>
+                  <td>${stats.count}</td>
+                  <td>${formatCurrency(stats.expected)}</td>
+                  <td style="color: var(--success); font-weight: 600;">${formatCurrency(stats.collected)}</td>
+                  <td style="color: ${balance > 0 ? 'var(--danger)' : 'var(--success)'}; font-weight: 600;">${formatCurrency(balance)}</td>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <div style="flex: 1; background: var(--bg-secondary); border-radius: 4px; height: 8px; overflow: hidden;">
+                        <div style="background: var(--success); height: 100%; width: ${rate}%;"></div>
+                      </div>
+                      <span style="font-weight: 600;">${rate}%</span>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+      
+      document.getElementById('reportContent').innerHTML = html;
+    }
+    
+    function displayDetailedReport(data) {
+      document.getElementById('reportTitle').textContent = 'Detailed Fee Report';
+      
+      const html = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Adm No</th>
+              <th>Student Name</th>
+              <th>Class</th>
+              <th>Total Fees</th>
+              <th>Amount Paid</th>
+              <th>Balance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(s => {
+              const balance = Number(s.balance);
+              const status = balance <= 0 
+                ? '<span style="color: var(--success);">✓ Paid</span>' 
+                : balance < Number(s.total_fees) * 0.5 
+                ? '<span style="color: var(--warning);">⚠ Partial</span>'
+                : '<span style="color: var(--danger);">✗ Owing</span>';
+              
+              return `
+                <tr>
+                  <td>${s.admission_no}</td>
+                  <td><strong>${s.full_name}</strong></td>
+                  <td>${s.class_name}</td>
+                  <td>${formatCurrency(s.total_fees)}</td>
+                  <td style="color: var(--success);">${formatCurrency(s.total_paid)}</td>
+                  <td style="color: ${balance > 0 ? 'var(--danger)' : 'var(--success)'}; font-weight: 600;">
+                    ${formatCurrency(balance)}
+                  </td>
+                  <td>${status}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+      
+      document.getElementById('reportContent').innerHTML = html;
+    }
+    
+    function displayDefaultersReport(data) {
+      document.getElementById('reportTitle').textContent = 'Fee Defaulters';
+      // Similar to detailed report but only showing students with balance
+      displayDetailedReport(data);
+    }
+    
+    function displayClearedReport(data) {
+      document.getElementById('reportTitle').textContent = 'Fully Paid Students';
+      displayDetailedReport(data);
+    }
+    
+    init();
+  </script>
+</body>
+</html>
