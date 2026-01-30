@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Fees | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Fee Management</div>
+        <a href="setup.html" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Fee Setup</span>
+        </a>
+        <a href="custom.html" class="nav-item active">
+          <span class="nav-icon">✏️</span>
+          <span class="nav-text">Custom Fees</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Payments</span>
+        </a>
+        <a href="receipts.html" class="nav-item">
+          <span class="nav-icon">🧾</span>
+          <span class="nav-text">Receipts</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Custom Fee Adjustments</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Info Card -->
+      <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <h2 style="color: white; margin-bottom: 12px;">ℹ️ About Custom Fees</h2>
+        <p style="line-height: 1.6;">
+          Custom fees allow you to set different fee amounts for individual students, such as scholarships, 
+          sponsorships, or special arrangements. The custom fee overrides the standard class fee for that student.
+        </p>
+      </div>
+      
+      <!-- Add Custom Fee Form -->
+      <div class="card">
+        <h2>Add Custom Fee</h2>
+        
+        <form id="customFeeForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Active Term</label>
+            <input type="text" id="activeTermInfo" readonly style="background: var(--bg-secondary);">
+          </div>
+          
+          <div class="form-group">
+            <label>Search Student</label>
+            <input type="search" id="studentSearch" placeholder="Search by name or admission number...">
+            <div id="searchResults" class="hidden" style="margin-top: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); max-height: 200px; overflow-y: auto;"></div>
+          </div>
+          
+          <div id="selectedStudent" class="hidden" style="padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); margin-bottom: 16px;">
+            <strong>Selected:</strong> <span id="selectedStudentName"></span> 
+            <button type="button" onclick="clearSelection()" style="float: right; background: none; border: none; cursor: pointer; color: var(--danger);">✕</button>
+          </div>
+          
+          <input type="hidden" id="selectedLearnerId">
+          
+          <div class="form-group">
+            <label>Fee Type</label>
+            <select id="feeType" required>
+              <option value="">Select fee type...</option>
+              <option value="full_sponsorship">Full Sponsorship (KES 0)</option>
+              <option value="partial_sponsorship">Partial Sponsorship</option>
+              <option value="custom_amount">Custom Amount</option>
+            </select>
+          </div>
+          
+          <div class="form-group" id="customAmountGroup">
+            <label>Custom Amount (KES)</label>
+            <input type="number" id="customAmount" min="0" step="0.01" placeholder="Enter custom fee amount">
+            <small class="text-muted">Standard fee: <span id="standardFee">-</span></small>
+          </div>
+          
+          <div class="form-group">
+            <label>Reason/Notes</label>
+            <textarea id="reason" rows="3" placeholder="e.g., County bursary, Sports scholarship, etc."></textarea>
+          </div>
+          
+          <button type="submit" id="saveBtn" class="btn btn-primary">Save Custom Fee</button>
+        </form>
+      </div>
+      
+      <!-- Existing Custom Fees -->
+      <div class="card">
+        <h2>Existing Custom Fees (Current Term)</h2>
+        
+        <div id="noCustomFees" class="hidden text-center text-muted" style="padding: 40px;">
+          No custom fees set for this term
+        </div>
+        
+        <table class="data-table hidden" id="customFeesTable">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Class</th>
+              <th>Standard Fee</th>
+              <th>Custom Fee</th>
+              <th>Type</th>
+              <th>Reason</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="customFeesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, formatCurrency } from '../js/config.js';
+    
+    let currentUser = null;
+    let activeTerm = null;
+    let searchTimeout = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadActiveTerm();
+      await loadCustomFees();
+      setupEventListeners();
+    }
+    
+    async function loadActiveTerm() {
+      const { data: term } = await supabase
+        .from('terms')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .eq('active', true)
+        .single();
+      
+      activeTerm = term;
+      
+      if (term) {
+        document.getElementById('activeTermInfo').value = `Year ${term.year} - Term ${term.term}`;
+      } else {
+        document.getElementById('activeTermInfo').value = 'No active term';
+        showToast('Please activate a term in Fee Setup first', 'warning');
+      }
+    }
+    
+    function setupEventListeners() {
+      // Student search
+      document.getElementById('studentSearch').addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => searchStudents(e.target.value), 300);
+      });
+      
+      // Fee type change
+      document.getElementById('feeType').addEventListener('change', (e) => {
+        const customAmountGroup = document.getElementById('customAmountGroup');
+        const customAmountInput = document.getElementById('customAmount');
+        
+        if (e.target.value === 'full_sponsorship') {
+          customAmountInput.value = 0;
+          customAmountInput.disabled = true;
+        } else {
+          customAmountInput.disabled = false;
+          if (e.target.value === 'partial_sponsorship' || e.target.value === 'custom_amount') {
+            customAmountInput.required = true;
+          }
+        }
+      });
+      
+      // Form submit
+      document.getElementById('customFeeForm').addEventListener('submit', saveCustomFee);
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    async function searchStudents(query) {
+      if (!query || query.length < 2) {
+        document.getElementById('searchResults').classList.add('hidden');
+        return;
+      }
+      
+      const { data: students } = await supabase
+        .from('learners')
+        .select('*, classes(name)')
+        .eq('school_id', currentUser.school_id)
+        .eq('active', true)
+        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,admission_no.ilike.%${query}%`)
+        .limit(10);
+      
+      const resultsDiv = document.getElementById('searchResults');
+      
+      if (!students || students.length === 0) {
+        resultsDiv.innerHTML = '<div style="padding: 12px;" class="text-muted">No students found</div>';
+        resultsDiv.classList.remove('hidden');
+        return;
+      }
+      
+      resultsDiv.innerHTML = students.map(s => `
+        <div onclick="selectStudent('${s.id}', '${s.first_name} ${s.last_name}', '${s.class_id}', '${s.admission_no}')" 
+             style="padding: 12px; cursor: pointer; border-bottom: 1px solid var(--border-color);"
+             onmouseover="this.style.background='var(--bg-secondary)'"
+             onmouseout="this.style.background='transparent'">
+          <strong>${s.first_name} ${s.last_name}</strong> (${s.admission_no})<br>
+          <small class="text-muted">${s.classes?.name || 'No class'}</small>
+        </div>
+      `).join('');
+      
+      resultsDiv.classList.remove('hidden');
+    }
+    
+    window.selectStudent = async function(id, name, classId, admNo) {
+      document.getElementById('selectedLearnerId').value = id;
+      document.getElementById('selectedStudentName').textContent = `${name} (${admNo})`;
+      document.getElementById('selectedStudent').classList.remove('hidden');
+      document.getElementById('searchResults').classList.add('hidden');
+      document.getElementById('studentSearch').value = '';
+      
+      // Get standard fee for this student's class
+      if (activeTerm) {
+        const { data: fee } = await supabase
+          .from('fees')
+          .select('amount')
+          .eq('school_id', currentUser.school_id)
+          .eq('class_id', classId)
+          .eq('term_id', activeTerm.id)
+          .single();
+        
+        if (fee) {
+          document.getElementById('standardFee').textContent = formatCurrency(fee.amount);
+        }
+      }
+    }
+    
+    window.clearSelection = function() {
+      document.getElementById('selectedLearnerId').value = '';
+      document.getElementById('selectedStudent').classList.add('hidden');
+      document.getElementById('standardFee').textContent = '-';
+    }
+    
+    async function saveCustomFee(e) {
+      e.preventDefault();
+      
+      const learnerId = document.getElementById('selectedLearnerId').value;
+      if (!learnerId) {
+        showToast('Please select a student', 'error');
+        return;
+      }
+      
+      if (!activeTerm) {
+        showToast('No active term', 'error');
+        return;
+      }
+      
+      const feeType = document.getElementById('feeType').value;
+      let customAmount = parseFloat(document.getElementById('customAmount').value);
+      
+      if (feeType === 'full_sponsorship') {
+        customAmount = 0;
+      }
+      
+      const customFeeData = {
+        school_id: currentUser.school_id,
+        learner_id: learnerId,
+        term_id: activeTerm.id,
+        fee_type: feeType,
+        custom_amount: customAmount,
+        reason: document.getElementById('reason').value.trim() || null
+      };
+      
+      const saveBtn = document.getElementById('saveBtn');
+      setButtonLoading(saveBtn, true, 'Saving...');
+      
+      try {
+        // Check if custom fee already exists
+        const { data: existing } = await supabase
+          .from('custom_fees')
+          .select('id')
+          .eq('learner_id', learnerId)
+          .eq('term_id', activeTerm.id)
+          .single();
+        
+        let error;
+        if (existing) {
+          // Update
+          ({ error } = await supabase
+            .from('custom_fees')
+            .update(customFeeData)
+            .eq('id', existing.id));
+        } else {
+          // Insert
+          ({ error } = await supabase
+            .from('custom_fees')
+            .insert([customFeeData]));
+        }
+        
+        if (error) throw error;
+        
+        showToast('Custom fee saved successfully!', 'success');
+        
+        // Reset form
+        document.getElementById('customFeeForm').reset();
+        clearSelection();
+        await loadActiveTerm();
+        await loadCustomFees();
+        
+      } catch (error) {
+        showToast('Error saving custom fee: ' + error.message, 'error');
+      } finally {
+        setButtonLoading(saveBtn, false, 'Save Custom Fee');
+      }
+    }
+    
+    async function loadCustomFees() {
+      if (!activeTerm) return;
+      
+      try {
+        const { data: customFees } = await supabase
+          .from('custom_fees')
+          .select(`
+            *,
+            learners(first_name, last_name, admission_no, class_id, classes(name))
+          `)
+          .eq('school_id', currentUser.school_id)
+          .eq('term_id', activeTerm.id);
+        
+        if (!customFees || customFees.length === 0) {
+          document.getElementById('noCustomFees').classList.remove('hidden');
+          document.getElementById('customFeesTable').classList.add('hidden');
+          return;
+        }
+        
+        // Get standard fees
+        const classIds = [...new Set(customFees.map(cf => cf.learners.class_id))];
+        const { data: fees } = await supabase
+          .from('fees')
+          .select('class_id, amount')
+          .eq('term_id', activeTerm.id)
+          .in('class_id', classIds);
+        
+        const feeMap = {};
+        fees?.forEach(f => feeMap[f.class_id] = f.amount);
+        
+        const tbody = document.getElementById('customFeesBody');
+        
+        const feeTypeLabels = {
+          'full_sponsorship': 'Full Sponsorship',
+          'partial_sponsorship': 'Partial Sponsorship',
+          'custom_amount': 'Custom Amount'
+        };
+        
+        tbody.innerHTML = customFees.map(cf => {
+          const standardFee = feeMap[cf.learners.class_id] || 0;
+          const saving = standardFee - cf.custom_amount;
+          
+          return `
+            <tr>
+              <td><strong>${cf.learners.first_name} ${cf.learners.last_name}</strong><br>
+                  <small class="text-muted">${cf.learners.admission_no}</small></td>
+              <td>${cf.learners.classes?.name || '-'}</td>
+              <td>${formatCurrency(standardFee)}</td>
+              <td style="font-weight: 600; color: var(--primary);">${formatCurrency(cf.custom_amount)}</td>
+              <td>${feeTypeLabels[cf.fee_type] || cf.fee_type}</td>
+              <td>${cf.reason || '-'}</td>
+              <td>
+                <button class="btn-icon" onclick="deleteCustomFee('${cf.id}')" title="Delete">🗑️</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+        
+        document.getElementById('customFeesTable').classList.remove('hidden');
+        document.getElementById('noCustomFees').classList.add('hidden');
+        
+      } catch (error) {
+        showToast('Error loading custom fees: ' + error.message, 'error');
+      }
+    }
+    
+    window.deleteCustomFee = async function(id) {
+      if (!confirm('Remove this custom fee? The student will revert to the standard class fee.')) return;
+      
+      try {
+        const { error } = await supabase
+          .from('custom_fees')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        showToast('Custom fee removed', 'success');
+        await loadCustomFees();
+        
+      } catch (error) {
+        showToast('Error removing custom fee: ' + error.message, 'error');
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
