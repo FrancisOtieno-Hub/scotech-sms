@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bulk Upload Students | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Students</div>
+        <a href="register.html" class="nav-item">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">Add Student</span>
+        </a>
+        <a href="list.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">All Students</span>
+        </a>
+        <a href="bulk-upload.html" class="nav-item active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Bulk Upload</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Bulk Upload Students from Excel</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Instructions -->
+      <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <h2 style="color: white; margin-bottom: 16px;">📋 Upload Instructions</h2>
+        <ol style="line-height: 1.8;">
+          <li>Download the Excel template below</li>
+          <li>Fill in student information (one student per row)</li>
+          <li>Save the file (keep it as .xlsx or .xls format)</li>
+          <li>Upload it using the form below</li>
+          <li>Review the preview and click "Import Students"</li>
+        </ol>
+        <button id="downloadTemplate" class="btn" style="background: white; color: var(--primary); margin-top: 16px;">
+          📥 Download Excel Template
+        </button>
+      </div>
+      
+      <!-- Upload Form -->
+      <div class="card">
+        <h2>Upload Excel File</h2>
+        
+        <div class="form-group">
+          <label>Select Class for All Students *</label>
+          <select id="classSelect" required style="max-width: 400px;">
+            <option value="">Choose class...</option>
+          </select>
+          <small class="text-muted">All students in this upload will be assigned to this class</small>
+        </div>
+        
+        <div class="form-group">
+          <label>Select Excel File *</label>
+          <input type="file" id="excelFile" accept=".xlsx,.xls" style="max-width: 400px;">
+        </div>
+        
+        <button id="previewBtn" class="btn btn-primary" disabled>
+          👁️ Preview Data
+        </button>
+      </div>
+      
+      <!-- Preview Section -->
+      <div id="previewSection" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2>Preview (<span id="studentCount">0</span> students)</h2>
+          <div style="display: flex; gap: 12px;">
+            <button id="importBtn" class="btn btn-success">
+              ✓ Import Students
+            </button>
+            <button id="cancelBtn" class="btn btn-secondary">
+              ✕ Cancel
+            </button>
+          </div>
+        </div>
+        
+        <div id="validationErrors" class="hidden" style="padding: 16px; background: #fee; border: 2px solid var(--danger); border-radius: var(--radius-sm); margin-bottom: 20px;">
+          <h4 style="color: var(--danger); margin-bottom: 12px;">⚠️ Validation Errors:</h4>
+          <ul id="errorList" style="color: var(--danger);"></ul>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="previewTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Gender</th>
+                <th>Date of Birth</th>
+                <th>Parent Name</th>
+                <th>Parent Phone</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Success Section -->
+      <div id="successSection" class="card hidden" style="background: var(--success); color: white; text-align: center; padding: 40px;">
+        <h2 style="color: white;">✅ Import Successful!</h2>
+        <p style="font-size: 1.2rem; margin: 20px 0;"><span id="importedCount">0</span> students have been imported successfully</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <a href="list.html" class="btn" style="background: white; color: var(--success);">View All Students</a>
+          <button id="importMoreBtn" class="btn" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid white;">Import More</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, generateNumber, isValidPhoneNumber } from '../js/config.js';
+    
+    let currentUser = null;
+    let parsedData = [];
+    let validatedData = [];
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadClasses();
+      setupEventListeners();
+    }
+    
+    async function loadClasses() {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const select = document.getElementById('classSelect');
+      data?.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        select.appendChild(option);
+      });
+    }
+    
+    function setupEventListeners() {
+      // File input change
+      document.getElementById('excelFile').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        document.getElementById('previewBtn').disabled = !file || !document.getElementById('classSelect').value;
+      });
+      
+      // Class select change
+      document.getElementById('classSelect').addEventListener('change', () => {
+        const file = document.getElementById('excelFile').files[0];
+        document.getElementById('previewBtn').disabled = !file || !document.getElementById('classSelect').value;
+      });
+      
+      // Download template
+      document.getElementById('downloadTemplate').addEventListener('click', downloadTemplate);
+      
+      // Preview button
+      document.getElementById('previewBtn').addEventListener('click', previewData);
+      
+      // Import button
+      document.getElementById('importBtn').addEventListener('click', importStudents);
+      
+      // Cancel button
+      document.getElementById('cancelBtn').addEventListener('click', () => {
+        document.getElementById('previewSection').classList.add('hidden');
+        document.getElementById('excelFile').value = '';
+        parsedData = [];
+        validatedData = [];
+      });
+      
+      // Import more button
+      document.getElementById('importMoreBtn').addEventListener('click', () => {
+        document.getElementById('successSection').classList.add('hidden');
+        document.getElementById('excelFile').value = '';
+        document.getElementById('classSelect').value = '';
+        parsedData = [];
+        validatedData = [];
+      });
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    function downloadTemplate() {
+      // Create template data
+      const templateData = [
+        {
+          'First Name': 'John',
+          'Last Name': 'Doe',
+          'Middle Name': '',
+          'Gender': 'Male',
+          'Date of Birth': '2015-05-15',
+          'Parent Name': 'Jane Doe',
+          'Parent Phone': '0712345678',
+          'Parent Email': 'jane.doe@email.com',
+          'Address': 'P.O. Box 123, Nairobi',
+          'Medical Info': 'No known allergies'
+        }
+      ];
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        {wch: 15}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 15},
+        {wch: 20}, {wch: 15}, {wch: 25}, {wch: 30}, {wch: 30}
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, ws, 'Students');
+      
+      // Download
+      XLSX.writeFile(wb, 'student_upload_template.xlsx');
+      showToast('Template downloaded successfully!', 'success');
+    }
+    
+    async function previewData() {
+      const file = document.getElementById('excelFile').files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+          
+          if (jsonData.length === 0) {
+            showToast('No data found in Excel file', 'error');
+            return;
+          }
+          
+          parsedData = jsonData;
+          await validateAndDisplayData();
+          
+        } catch (error) {
+          showToast('Error reading Excel file: ' + error.message, 'error');
+        }
+      };
+      
+      reader.readAsArrayBuffer(file);
+    }
+    
+    async function validateAndDisplayData() {
+      const errors = [];
+      validatedData = [];
+      const classId = document.getElementById('classSelect').value;
+      
+      for (let i = 0; i < parsedData.length; i++) {
+        const row = parsedData[i];
+        const rowNum = i + 2; // Excel row number (accounting for header)
+        const student = {
+          firstName: row['First Name']?.toString().trim(),
+          lastName: row['Last Name']?.toString().trim(),
+          middleName: row['Middle Name']?.toString().trim() || null,
+          gender: row['Gender']?.toString().trim(),
+          dateOfBirth: row['Date of Birth']?.toString().trim(),
+          parentName: row['Parent Name']?.toString().trim() || null,
+          parentPhone: row['Parent Phone']?.toString().trim() || null,
+          parentEmail: row['Parent Email']?.toString().trim() || null,
+          address: row['Address']?.toString().trim() || null,
+          medicalInfo: row['Medical Info']?.toString().trim() || null,
+          rowNum: rowNum,
+          valid: true,
+          errors: []
+        };
+        
+        // Validate required fields
+        if (!student.firstName) {
+          student.errors.push('First name is required');
+          student.valid = false;
+        }
+        if (!student.lastName) {
+          student.errors.push('Last name is required');
+          student.valid = false;
+        }
+        if (!student.gender || !['Male', 'Female'].includes(student.gender)) {
+          student.errors.push('Gender must be "Male" or "Female"');
+          student.valid = false;
+        }
+        
+        // Validate date of birth
+        if (student.dateOfBirth) {
+          const dobDate = new Date(student.dateOfBirth);
+          if (isNaN(dobDate.getTime())) {
+            student.errors.push('Invalid date format (use YYYY-MM-DD)');
+            student.valid = false;
+          }
+        }
+        
+        // Validate phone number
+        if (student.parentPhone && !isValidPhoneNumber(student.parentPhone)) {
+          student.errors.push('Invalid phone number format');
+          student.valid = false;
+        }
+        
+        if (!student.valid) {
+          errors.push(`Row ${rowNum}: ${student.errors.join(', ')}`);
+        }
+        
+        validatedData.push(student);
+      }
+      
+      // Display errors if any
+      if (errors.length > 0) {
+        document.getElementById('errorList').innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+        document.getElementById('validationErrors').classList.remove('hidden');
+      } else {
+        document.getElementById('validationErrors').classList.add('hidden');
+      }
+      
+      // Display preview
+      displayPreview();
+      document.getElementById('previewSection').classList.remove('hidden');
+    }
+    
+    function displayPreview() {
+      const tbody = document.getElementById('previewBody');
+      const validCount = validatedData.filter(s => s.valid).length;
+      
+      document.getElementById('studentCount').textContent = validCount;
+      
+      tbody.innerHTML = validatedData.map((student, index) => {
+        const statusColor = student.valid ? 'var(--success)' : 'var(--danger)';
+        const statusIcon = student.valid ? '✓' : '✗';
+        const statusText = student.valid ? 'Valid' : 'Invalid';
+        
+        return `
+          <tr style="${!student.valid ? 'background: #fee;' : ''}">
+            <td>${index + 1}</td>
+            <td>${student.firstName || '-'}</td>
+            <td>${student.lastName || '-'}</td>
+            <td>${student.gender || '-'}</td>
+            <td>${student.dateOfBirth || '-'}</td>
+            <td>${student.parentName || '-'}</td>
+            <td>${student.parentPhone || '-'}</td>
+            <td style="color: ${statusColor}; font-weight: 600;">
+              ${statusIcon} ${statusText}
+              ${!student.valid ? `<br><small>${student.errors.join(', ')}</small>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
+    async function importStudents() {
+      const validStudents = validatedData.filter(s => s.valid);
+      
+      if (validStudents.length === 0) {
+        showToast('No valid students to import', 'error');
+        return;
+      }
+      
+      const confirmed = confirm(`Import ${validStudents.length} students?\n\nInvalid rows will be skipped.`);
+      if (!confirmed) return;
+      
+      const importBtn = document.getElementById('importBtn');
+      setButtonLoading(importBtn, true, 'Importing...');
+      
+      try {
+        const classId = document.getElementById('classSelect').value;
+        let imported = 0;
+        
+        for (const student of validStudents) {
+          // Generate admission number
+          const admNo = await generateNumber(currentUser.school_id, 'learner');
+          
+          const studentData = {
+            school_id: currentUser.school_id,
+            admission_no: admNo,
+            first_name: student.firstName,
+            last_name: student.lastName,
+            middle_name: student.middleName,
+            gender: student.gender,
+            date_of_birth: student.dateOfBirth || null,
+            class_id: classId,
+            parent_name: student.parentName,
+            parent_phone: student.parentPhone,
+            parent_email: student.parentEmail,
+            address: student.address,
+            medical_info: student.medicalInfo,
+            active: true
+          };
+          
+          const { error } = await supabase
+            .from('learners')
+            .insert([studentData]);
+          
+          if (error) {
+            console.error('Error importing student:', student, error);
+          } else {
+            imported++;
+          }
+        }
+        
+        // Show success
+        document.getElementById('importedCount').textContent = imported;
+        document.getElementById('previewSection').classList.add('hidden');
+        document.getElementById('successSection').classList.remove('hidden');
+        
+        showToast(`Successfully imported ${imported} students!`, 'success');
+        
+      } catch (error) {
+        showToast('Error importing students: ' + error.message, 'error');
+      } finally {
+        setButtonLoading(importBtn, false, '✓ Import Students');
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
