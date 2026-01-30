@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Class Management | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Academic</div>
+        <a href="subjects.html" class="nav-item active">
+          <span class="nav-icon">📚</span>
+          <span class="nav-text">Subjects</span>
+        </a>
+        <a href="classes.html" class="nav-item">
+          <span class="nav-icon">🎓</span>
+          <span class="nav-text">Classes</span>
+        </a>
+        <a href="timetable.html" class="nav-item">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Timetable</span>
+        </a>
+        <a href="calendar.html" class="nav-item">
+          <span class="nav-icon">🗓️</span>
+          <span class="nav-text">Calendar</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <h1>Class Management</h1>
+      <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Add Class Form -->
+      <div class="card">
+        <h2>Add New Class</h2>
+        <form id="classForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Class Name *</label>
+            <input type="text" id="className" placeholder="e.g., Grade 4A" required>
+          </div>
+          <div class="form-group">
+            <label>Level *</label>
+            <input type="number" id="level" min="0" max="12" placeholder="0-12" required>
+            <small class="text-muted">0 = Pre-Unit, 1-9 = Grade levels</small>
+          </div>
+          <div class="form-group">
+            <label>Capacity</label>
+            <input type="number" id="capacity" min="1" placeholder="e.g., 40">
+          </div>
+          <div class="form-group">
+            <label>Class Teacher</label>
+            <select id="classTeacher">
+              <option value="">No teacher assigned</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Class</button>
+        </form>
+      </div>
+      
+      <!-- Classes List -->
+      <div class="card">
+        <h2>All Classes</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Class Name</th>
+              <th>Level</th>
+              <th>Students</th>
+              <th>Capacity</th>
+              <th>Class Teacher</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="classesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadTeachers();
+      await loadClasses();
+      setupEventListeners();
+    }
+    
+    async function loadTeachers() {
+      const { data } = await supabase
+        .from('staff')
+        .select('id, first_name, last_name')
+        .eq('school_id', currentUser.school_id)
+        .eq('active', true)
+        .eq('position', 'Teacher')
+        .order('first_name');
+      
+      const select = document.getElementById('classTeacher');
+      data?.forEach(teacher => {
+        const option = document.createElement('option');
+        option.value = teacher.id;
+        option.textContent = `${teacher.first_name} ${teacher.last_name}`;
+        select.appendChild(option);
+      });
+    }
+    
+    async function loadClasses() {
+      const { data: classes } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          teacher:staff!class_teacher(first_name, last_name),
+          learners(count)
+        `)
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const tbody = document.getElementById('classesBody');
+      
+      tbody.innerHTML = classes?.map(cls => {
+        const studentCount = cls.learners?.[0]?.count || 0;
+        const utilization = cls.capacity ? Math.round((studentCount / cls.capacity) * 100) : 0;
+        
+        return `
+          <tr>
+            <td><strong>${cls.name}</strong></td>
+            <td>Level ${cls.level}</td>
+            <td>${studentCount}</td>
+            <td>${cls.capacity || '-'}</td>
+            <td>${cls.teacher ? `${cls.teacher.first_name} ${cls.teacher.last_name}` : '-'}</td>
+            <td>
+              <button class="btn-icon" onclick="editClass('${cls.id}')" title="Edit">✏️</button>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="6" class="text-center text-muted">No classes found</td></tr>';
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('classForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const classData = {
+          school_id: currentUser.school_id,
+          name: document.getElementById('className').value.trim(),
+          level: parseInt(document.getElementById('level').value),
+          capacity: parseInt(document.getElementById('capacity').value) || null,
+          class_teacher: document.getElementById('classTeacher').value || null
+        };
+        
+        try {
+          const { error } = await supabase
+            .from('classes')
+            .insert([classData]);
+          
+          if (error) throw error;
+          
+          showToast('Class added successfully!', 'success');
+          document.getElementById('classForm').reset();
+          await loadClasses();
+          
+        } catch (error) {
+          showToast('Error: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    window.editClass = async function(classId) {
+      // Similar to edit subject - show modal, update class
+    }
+    
+    init();
+  </script>
+</body>
+</html>
