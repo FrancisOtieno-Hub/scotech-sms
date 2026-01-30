@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Budget Management | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Finance</div>
+        <a href="expenses.html" class="nav-item active">
+          <span class="nav-icon">💸</span>
+          <span class="nav-text">Expenses</span>
+        </a>
+        <a href="categories.html" class="nav-item">
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Categories</span>
+        </a>
+        <a href="budget.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Budget</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <h1>Budget Management</h1>
+      <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Monthly Budget Overview -->
+      <div class="card">
+        <h2>Monthly Budget Overview</h2>
+        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+          <select id="monthSelect" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: var(--radius);">
+            <option value="">Select Month...</option>
+          </select>
+          <button id="loadBudgetBtn" class="btn btn-primary">Load Budget</button>
+        </div>
+        
+        <div id="budgetSummary"></div>
+      </div>
+      
+      <!-- Set Budget -->
+      <div class="card">
+        <h2>Set Category Budgets</h2>
+        <form id="budgetForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Month *</label>
+            <input type="month" id="budgetMonth" required>
+          </div>
+          <div class="form-group">
+            <label>Category *</label>
+            <select id="categoryId" required>
+              <option value="">Select Category</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Budget Amount (KES) *</label>
+            <input type="number" id="budgetAmount" min="0" step="0.01" required placeholder="0.00">
+          </div>
+          <button type="submit" class="btn btn-primary">Set Budget</button>
+        </form>
+      </div>
+      
+      <!-- Budget vs Actual -->
+      <div class="card">
+        <h2>Budget vs Actual (Current Month)</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Budget</th>
+              <th>Actual</th>
+              <th>Variance</th>
+              <th>Usage %</th>
+            </tr>
+          </thead>
+          <tbody id="budgetTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatCurrency } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      populateMonthSelect();
+      await loadCategories();
+      await loadBudgetComparison();
+      setupEventListeners();
+    }
+    
+    function populateMonthSelect() {
+      const select = document.getElementById('monthSelect');
+      const now = new Date();
+      
+      // Populate for 12 months (6 past, current, 5 future)
+      for (let i = -6; i <= 5; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        if (i === 0) option.selected = true;
+        select.appendChild(option);
+      }
+      
+      // Set current month in budget form
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      document.getElementById('budgetMonth').value = currentMonth;
+    }
+    
+    async function loadCategories() {
+      const { data } = await supabase
+        .from('expense_categories')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('name');
+      
+      const select = document.getElementById('categoryId');
+      data?.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        select.appendChild(option);
+      });
+    }
+    
+    async function loadBudgetComparison() {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const budgetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      
+      // Get categories
+      const { data: categories } = await supabase
+        .from('expense_categories')
+        .select('*')
+        .eq('school_id', currentUser.school_id);
+      
+      // Get budgets (need to create budgets table)
+      // For now, we'll show expenses only
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('category_id, amount')
+        .eq('school_id', currentUser.school_id)
+        .eq('status', 'approved')
+        .gte('expense_date', firstDay)
+        .lte('expense_date', lastDay);
+      
+      // Calculate actual spending per category
+      const actual = {};
+      expenses?.forEach(e => {
+        actual[e.category_id] = (actual[e.category_id] || 0) + Number(e.amount);
+      });
+      
+      const tbody = document.getElementById('budgetTableBody');
+      const totalBudget = 0;
+      const totalActual = Object.values(actual).reduce((sum, val) => sum + val, 0);
+      
+      tbody.innerHTML = categories?.map(cat => {
+        const actualAmount = actual[cat.id] || 0;
+        const budgetAmount = 0; // Would come from budgets table
+        const variance = budgetAmount - actualAmount;
+        const usage = budgetAmount > 0 ? (actualAmount / budgetAmount * 100).toFixed(1) : 0;
+        
+        return `
+          <tr>
+            <td><strong>${cat.name}</strong></td>
+            <td>${budgetAmount > 0 ? formatCurrency(budgetAmount) : '-'}</td>
+            <td style="font-weight: 600; color: var(--danger);">${formatCurrency(actualAmount)}</td>
+            <td style="color: ${variance >= 0 ? 'var(--success)' : 'var(--danger)'};">${budgetAmount > 0 ? formatCurrency(variance) : '-'}</td>
+            <td>
+              ${budgetAmount > 0 ? `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="flex: 1; background: var(--bg-secondary); border-radius: 4px; height: 8px; overflow: hidden;">
+                    <div style="background: ${usage > 100 ? 'var(--danger)' : usage > 80 ? 'var(--warning)' : 'var(--success)'}; height: 100%; width: ${Math.min(usage, 100)}%;"></div>
+                  </div>
+                  <span style="font-weight: 600; min-width: 50px;">${usage}%</span>
+                </div>
+              ` : '-'}
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="5" class="text-center text-muted">No data available</td></tr>';
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('budgetForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        showToast('Budget feature requires budgets table. See implementation notes.', 'info');
+        
+        // Implementation would save to budgets table
+        // const budgetData = {
+        //   school_id: currentUser.school_id,
+        //   category_id: document.getElementById('categoryId').value,
+        //   budget_month: document.getElementById('budgetMonth').value,
+        //   amount: parseFloat(document.getElementById('budgetAmount').value)
+        // };
+      });
+    }
+    
+    init();
+  </script>
+</body>
+</html>
