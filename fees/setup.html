@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fee Setup | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Fee Management</div>
+        <a href="setup.html" class="nav-item active">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Fee Setup</span>
+        </a>
+        <a href="custom.html" class="nav-item">
+          <span class="nav-icon">✏️</span>
+          <span class="nav-text">Custom Fees</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Payments</span>
+        </a>
+        <a href="receipts.html" class="nav-item">
+          <span class="nav-icon">🧾</span>
+          <span class="nav-text">Receipts</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Fee Setup & Term Management</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Terms Management -->
+      <div class="card">
+        <h2>Academic Terms</h2>
+        <p class="text-muted">Manage academic terms for fee collection</p>
+        
+        <button class="btn btn-primary" id="addTermBtn" style="margin-bottom: 20px;">+ Add New Term</button>
+        
+        <table class="data-table" id="termsTable">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Term</th>
+              <th>Period</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="termsBody">
+            <tr><td colspan="5" class="text-center text-muted">Loading terms...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Fee Structure -->
+      <div class="card">
+        <h2>Fee Structure (Current Term)</h2>
+        <p class="text-muted">Set fees for each class in the active term</p>
+        
+        <div id="noActiveTerm" class="hidden" style="padding: 40px; text-align: center; color: var(--text-muted);">
+          <h3>No Active Term</h3>
+          <p>Please activate a term to set up fees</p>
+        </div>
+        
+        <div id="feeStructure">
+          <div style="margin-bottom: 20px;">
+            <strong>Active Term:</strong> <span id="activeTermInfo">-</span>
+          </div>
+          
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>Current Fee Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="feesBody">
+              <tr><td colspan="3" class="text-center text-muted">Loading fees...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Add/Edit Term Modal -->
+  <div id="termModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 500px; width: 90%;">
+      <h2 id="termModalTitle">Add New Term</h2>
+      <form id="termForm">
+        <input type="hidden" id="termId">
+        <div class="form-group">
+          <label>Academic Year</label>
+          <input type="number" id="termYear" min="2020" max="2050" required>
+        </div>
+        <div class="form-group">
+          <label>Term</label>
+          <select id="termNumber" required>
+            <option value="1">Term 1</option>
+            <option value="2">Term 2</option>
+            <option value="3">Term 3</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="startDate" required>
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" id="endDate" required>
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 12px;">
+            <input type="checkbox" id="termActive">
+            <span>Set as Active Term</span>
+          </label>
+          <small class="text-muted">Only one term can be active at a time</small>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary">Save Term</button>
+          <button type="button" class="btn btn-secondary" onclick="closeTermModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Edit Fee Modal -->
+  <div id="feeModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 500px; width: 90%;">
+      <h2>Set Fee Amount</h2>
+      <form id="feeForm">
+        <input type="hidden" id="feeId">
+        <input type="hidden" id="feeClassId">
+        <input type="hidden" id="feeTermId">
+        <div class="form-group">
+          <label>Class</label>
+          <input type="text" id="feeClassName" readonly style="background: var(--bg-secondary);">
+        </div>
+        <div class="form-group">
+          <label>Fee Amount (KES)</label>
+          <input type="number" id="feeAmount" min="0" step="0.01" required placeholder="e.g., 10000">
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary">Save Fee</button>
+          <button type="button" class="btn btn-secondary" onclick="closeFeeModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, formatCurrency, formatDate } from '../js/config.js';
+    
+    let currentUser = null;
+    let activeTerm = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadTerms();
+      await loadFees();
+      setupEventListeners();
+    }
+    
+    async function loadTerms() {
+      try {
+        const { data: terms, error } = await supabase
+          .from('terms')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .order('year', { ascending: false })
+          .order('term', { ascending: false });
+        
+        if (error) throw error;
+        
+        const tbody = document.getElementById('termsBody');
+        
+        if (!terms || terms.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No terms created yet</td></tr>';
+          return;
+        }
+        
+        // Find active term
+        activeTerm = terms.find(t => t.active);
+        
+        tbody.innerHTML = terms.map(term => {
+          const statusBadge = term.active 
+            ? '<span style="background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Active</span>'
+            : '<span style="background: #f3f4f6; color: #6b7280; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">Inactive</span>';
+          
+          return `
+            <tr>
+              <td><strong>${term.year}</strong></td>
+              <td>Term ${term.term}</td>
+              <td>${formatDate(term.start_date)} - ${formatDate(term.end_date)}</td>
+              <td>${statusBadge}</td>
+              <td>
+                <div class="action-buttons">
+                  ${!term.active ? `<button class="btn-icon" onclick="activateTerm('${term.id}')" title="Set Active">✓</button>` : ''}
+                  <button class="btn-icon" onclick="editTerm('${term.id}')" title="Edit">✏️</button>
+                  ${!term.active ? `<button class="btn-icon" onclick="deleteTerm('${term.id}')" title="Delete">🗑️</button>` : ''}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+        
+      } catch (error) {
+        showToast('Error loading terms: ' + error.message, 'error');
+      }
+    }
+    
+    async function loadFees() {
+      if (!activeTerm) {
+        document.getElementById('feeStructure').classList.add('hidden');
+        document.getElementById('noActiveTerm').classList.remove('hidden');
+        return;
+      }
+      
+      document.getElementById('activeTermInfo').textContent = `Year ${activeTerm.year} - Term ${activeTerm.term}`;
+      
+      try {
+        const { data: classes } = await supabase
+          .from('classes')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .order('level');
+        
+        const { data: fees } = await supabase
+          .from('fees')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .eq('term_id', activeTerm.id);
+        
+        const tbody = document.getElementById('feesBody');
+        
+        tbody.innerHTML = classes.map(cls => {
+          const fee = fees?.find(f => f.class_id === cls.id);
+          const amount = fee ? formatCurrency(fee.amount) : '-';
+          const feeId = fee?.id || '';
+          
+          return `
+            <tr>
+              <td><strong>${cls.name}</strong></td>
+              <td>${amount}</td>
+              <td>
+                <button class="btn btn-sm btn-primary" onclick="editFee('${cls.id}', '${cls.name}', '${feeId}', ${fee?.amount || 0})">
+                  ${fee ? 'Edit' : 'Set'} Fee
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+        
+      } catch (error) {
+        showToast('Error loading fees: ' + error.message, 'error');
+      }
+    }
+    
+    function setupEventListeners() {
+      // Add term button
+      document.getElementById('addTermBtn').addEventListener('click', () => {
+        document.getElementById('termModalTitle').textContent = 'Add New Term';
+        document.getElementById('termForm').reset();
+        document.getElementById('termId').value = '';
+        document.getElementById('termYear').value = new Date().getFullYear();
+        document.getElementById('termModal').classList.remove('hidden');
+      });
+      
+      // Term form submit
+      document.getElementById('termForm').addEventListener('submit', saveTerm);
+      
+      // Fee form submit
+      document.getElementById('feeForm').addEventListener('submit', saveFee);
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    async function saveTerm(e) {
+      e.preventDefault();
+      
+      const termId = document.getElementById('termId').value;
+      const termData = {
+        school_id: currentUser.school_id,
+        year: parseInt(document.getElementById('termYear').value),
+        term: parseInt(document.getElementById('termNumber').value),
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value,
+        active: document.getElementById('termActive').checked
+      };
+      
+      try {
+        // If setting as active, deactivate all other terms first
+        if (termData.active) {
+          await supabase
+            .from('terms')
+            .update({ active: false })
+            .eq('school_id', currentUser.school_id);
+        }
+        
+        let error;
+        if (termId) {
+          // Update
+          ({ error } = await supabase
+            .from('terms')
+            .update(termData)
+            .eq('id', termId));
+        } else {
+          // Insert
+          ({ error } = await supabase
+            .from('terms')
+            .insert([termData]));
+        }
+        
+        if (error) throw error;
+        
+        showToast('Term saved successfully!', 'success');
+        closeTermModal();
+        await loadTerms();
+        await loadFees();
+        
+      } catch (error) {
+        showToast('Error saving term: ' + error.message, 'error');
+      }
+    }
+    
+    window.editTerm = async function(termId) {
+      const { data: term } = await supabase
+        .from('terms')
+        .select('*')
+        .eq('id', termId)
+        .single();
+      
+      if (term) {
+        document.getElementById('termModalTitle').textContent = 'Edit Term';
+        document.getElementById('termId').value = term.id;
+        document.getElementById('termYear').value = term.year;
+        document.getElementById('termNumber').value = term.term;
+        document.getElementById('startDate').value = term.start_date;
+        document.getElementById('endDate').value = term.end_date;
+        document.getElementById('termActive').checked = term.active;
+        document.getElementById('termModal').classList.remove('hidden');
+      }
+    }
+    
+    window.activateTerm = async function(termId) {
+      if (!confirm('Set this term as active? This will deactivate the current active term.')) return;
+      
+      try {
+        // Deactivate all
+        await supabase
+          .from('terms')
+          .update({ active: false })
+          .eq('school_id', currentUser.school_id);
+        
+        // Activate this one
+        const { error } = await supabase
+          .from('terms')
+          .update({ active: true })
+          .eq('id', termId);
+        
+        if (error) throw error;
+        
+        showToast('Term activated successfully!', 'success');
+        await loadTerms();
+        await loadFees();
+        
+      } catch (error) {
+        showToast('Error activating term: ' + error.message, 'error');
+      }
+    }
+    
+    window.deleteTerm = async function(termId) {
+      if (!confirm('Delete this term? All associated fees and payments will remain.')) return;
+      
+      try {
+        const { error } = await supabase
+          .from('terms')
+          .delete()
+          .eq('id', termId);
+        
+        if (error) throw error;
+        
+        showToast('Term deleted successfully!', 'success');
+        await loadTerms();
+        
+      } catch (error) {
+        showToast('Error deleting term: ' + error.message, 'error');
+      }
+    }
+    
+    window.editFee = function(classId, className, feeId, currentAmount) {
+      document.getElementById('feeId').value = feeId;
+      document.getElementById('feeClassId').value = classId;
+      document.getElementById('feeTermId').value = activeTerm.id;
+      document.getElementById('feeClassName').value = className;
+      document.getElementById('feeAmount').value = currentAmount || '';
+      document.getElementById('feeModal').classList.remove('hidden');
+    }
+    
+    async function saveFee(e) {
+      e.preventDefault();
+      
+      const feeId = document.getElementById('feeId').value;
+      const feeData = {
+        school_id: currentUser.school_id,
+        class_id: document.getElementById('feeClassId').value,
+        term_id: document.getElementById('feeTermId').value,
+        amount: parseFloat(document.getElementById('feeAmount').value)
+      };
+      
+      try {
+        let error;
+        if (feeId) {
+          // Update
+          ({ error } = await supabase
+            .from('fees')
+            .update({ amount: feeData.amount })
+            .eq('id', feeId));
+        } else {
+          // Insert
+          ({ error } = await supabase
+            .from('fees')
+            .insert([feeData]));
+        }
+        
+        if (error) throw error;
+        
+        showToast('Fee saved successfully!', 'success');
+        closeFeeModal();
+        await loadFees();
+        
+      } catch (error) {
+        showToast('Error saving fee: ' + error.message, 'error');
+      }
+    }
+    
+    window.closeTermModal = function() {
+      document.getElementById('termModal').classList.add('hidden');
+    }
+    
+    window.closeFeeModal = function() {
+      document.getElementById('feeModal').classList.add('hidden');
+    }
+    
+    init();
+  </script>
+</body>
+</html>
