@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Role Permissions | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Settings</div>
+        <a href="school.html" class="nav-item">
+          <span class="nav-icon">🏫</span>
+          <span class="nav-text">School Profile</span>
+        </a>
+        <a href="users.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Users</span>
+        </a>
+        <a href="permissions.html" class="nav-item active">
+          <span class="nav-icon">🔐</span>
+          <span class="nav-text">Permissions</span>
+        </a>
+        <a href="sms-config.html" class="nav-item">
+          <span class="nav-icon">📱</span>
+          <span class="nav-text">SMS Config</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Role Permissions</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Permissions Matrix -->
+      <div class="card">
+        <h2>Permissions by Role</h2>
+        <p class="text-muted">Define what each role can access and modify</p>
+        
+        <div style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Permission</th>
+                <th>School Admin</th>
+                <th>Teacher</th>
+                <th>Accountant</th>
+                <th>Support</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Students</strong></td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--success);">✓ View, Edit</td>
+                <td style="color: var(--info);">✓ View Only</td>
+                <td style="color: var(--info);">✓ View Only</td>
+              </tr>
+              <tr>
+                <td><strong>Staff</strong></td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+              <tr>
+                <td><strong>Fees & Payments</strong></td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+              <tr>
+                <td><strong>Expenses</strong></td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+              <tr>
+                <td><strong>Academic (Timetable, Subjects)</strong></td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--success);">✓ View, Edit</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+              <tr>
+                <td><strong>Reports</strong></td>
+                <td style="color: var(--success);">✓ All Reports</td>
+                <td style="color: var(--info);">✓ Academic Reports</td>
+                <td style="color: var(--info);">✓ Financial Reports</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+              <tr>
+                <td><strong>SMS</strong></td>
+                <td style="color: var(--success);">✓ Send SMS</td>
+                <td style="color: var(--info);">✓ Send to Class</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+              <tr>
+                <td><strong>Settings</strong></td>
+                <td style="color: var(--success);">✓ Full Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+                <td style="color: var(--danger);">✗ No Access</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div style="margin-top: 24px; padding: 16px; background: #fef3c7; border-radius: var(--radius-sm);">
+          <strong>ℹ️ Note:</strong> Permissions are enforced at the code level using the hasPermission() function in config.js and database Row Level Security (RLS) policies.
+        </div>
+      </div>
+      
+      <!-- Role Descriptions -->
+      <div class="card">
+        <h2>Role Descriptions</h2>
+        
+        <div style="display: grid; gap: 16px;">
+          <div style="padding: 16px; border-left: 4px solid #4f46e5; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 8px 0; color: #4f46e5;">🎯 School Admin</h4>
+            <p style="margin: 0; line-height: 1.6;">Full system access. Can manage users, settings, view all reports, and perform all operations. This is the highest level of access typically given to the Principal or Head Teacher.</p>
+          </div>
+          
+          <div style="padding: 16px; border-left: 4px solid #10b981; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 8px 0; color: #10b981;">👨‍🏫 Teacher</h4>
+            <p style="margin: 0; line-height: 1.6;">Can manage students, academic records, timetables, subjects, and send SMS to their classes. Teachers can view and edit student information but cannot access financial records or staff management.</p>
+          </div>
+          
+          <div style="padding: 16px; border-left: 4px solid #f59e0b; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 8px 0; color: #f59e0b;">💰 Accountant</h4>
+            <p style="margin: 0; line-height: 1.6;">Full access to fees, payments, expenses, and financial reports. Can view student information for fee collection purposes. Cannot access academic management or staff records.</p>
+          </div>
+          
+          <div style="padding: 16px; border-left: 4px solid #3b82f6; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 8px 0; color: #3b82f6;">👥 Support Staff</h4>
+            <p style="margin: 0; line-height: 1.6;">Limited access to view student information only. Cannot modify data or access financial information. Suitable for receptionists, secretaries, or assistants who need to look up student details.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Permission Details -->
+      <div class="card">
+        <h2>Detailed Permission Breakdown</h2>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 12px 0; color: var(--primary);">📚 Student Management</h4>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+              <li>Register new students</li>
+              <li>Edit student details</li>
+              <li>Delete/deactivate students</li>
+              <li>Upload bulk students</li>
+              <li>Promote students</li>
+              <li>View student profiles</li>
+            </ul>
+          </div>
+          
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 12px 0; color: var(--primary);">💵 Financial Access</h4>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+              <li>Fee structure setup</li>
+              <li>Record payments</li>
+              <li>Issue receipts</li>
+              <li>Custom fee adjustments</li>
+              <li>Expense tracking</li>
+              <li>Financial reports</li>
+            </ul>
+          </div>
+          
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 12px 0; color: var(--primary);">📖 Academic Tools</h4>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+              <li>Create timetables</li>
+              <li>Manage subjects</li>
+              <li>Manage classes</li>
+              <li>School calendar</li>
+              <li>Department management</li>
+              <li>Academic reports</li>
+            </ul>
+          </div>
+          
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+            <h4 style="margin: 0 0 12px 0; color: var(--primary);">⚙️ Administration</h4>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+              <li>User management</li>
+              <li>School settings</li>
+              <li>SMS configuration</li>
+              <li>Staff management</li>
+              <li>Duty roster</li>
+              <li>System settings</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser } from '../js/config.js';
+    
+    async function init() {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      // Only admins can view permissions
+      if (currentUser.role !== 'school_admin' && currentUser.role !== 'super_admin') {
+        window.location.href = '../dashboard.html';
+        return;
+      }
+      
+      setupEventListeners();
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    init();
+  </script>
+</body>
+</html>
