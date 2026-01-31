@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Reports | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Reports</div>
+        <a href="dashboard.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics Dashboard</span>
+        </a>
+        <a href="students.html" class="nav-item active">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Student Reports</span>
+        </a>
+        <a href="finance.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Financial Reports</span>
+        </a>
+        <a href="custom.html" class="nav-item">
+          <span class="nav-icon">🔧</span>
+          <span class="nav-text">Custom Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Student Reports</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-secondary" onclick="exportReport()">📥 Export</button>
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨️ Print</button>
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Report Filters -->
+      <div class="card">
+        <h2>Report Filters</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label>Class</label>
+            <select id="classFilter">
+              <option value="">All Classes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Gender</label>
+            <select id="genderFilter">
+              <option value="">All</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="statusFilter">
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+              <option value="all">All Students</option>
+            </select>
+          </div>
+          <div style="display: flex; align-items: end;">
+            <button class="btn btn-primary btn-block" id="generateBtn">Generate Report</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Summary Stats -->
+      <div id="summaryStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;"></div>
+      
+      <!-- Report Content -->
+      <div class="card">
+        <h2 id="reportTitle">Student List Report</h2>
+        <div id="reportContent">
+          <p class="text-center text-muted" style="padding: 40px;">
+            Select filters and click "Generate Report" to view student data
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatDate, exportToExcel } from '../js/config.js';
+    
+    let currentUser = null;
+    let currentData = [];
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadClasses();
+      setupEventListeners();
+    }
+    
+    async function loadClasses() {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const select = document.getElementById('classFilter');
+      data?.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        select.appendChild(option);
+      });
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('generateBtn').addEventListener('click', generateReport);
+      
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    async function generateReport() {
+      const classId = document.getElementById('classFilter').value;
+      const gender = document.getElementById('genderFilter').value;
+      const status = document.getElementById('statusFilter').value;
+      
+      try {
+        let query = supabase
+          .from('learners')
+          .select('*, classes(name, level)')
+          .eq('school_id', currentUser.school_id)
+          .order('first_name');
+        
+        if (classId) {
+          query = query.eq('class_id', classId);
+        }
+        
+        if (gender) {
+          query = query.eq('gender', gender);
+        }
+        
+        if (status === 'active') {
+          query = query.eq('active', true);
+        } else if (status === 'inactive') {
+          query = query.eq('active', false);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        currentData = data || [];
+        
+        displaySummary(currentData);
+        displayReport(currentData);
+        
+      } catch (error) {
+        showToast('Error generating report: ' + error.message, 'error');
+      }
+    }
+    
+    function displaySummary(data) {
+      const total = data.length;
+      const male = data.filter(s => s.gender === 'Male').length;
+      const female = data.filter(s => s.gender === 'Female').length;
+      const active = data.filter(s => s.active).length;
+      
+      document.getElementById('summaryStats').innerHTML = `
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+          <div class="text-muted" style="font-size: 0.85rem;">Total Students</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${total}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid #3b82f6;">
+          <div class="text-muted" style="font-size: 0.85rem;">Male</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${male}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid #ec4899;">
+          <div class="text-muted" style="font-size: 0.85rem;">Female</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${female}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--success);">
+          <div class="text-muted" style="font-size: 0.85rem;">Active</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${active}</div>
+        </div>
+      `;
+    }
+    
+    function displayReport(data) {
+      if (!data || data.length === 0) {
+        document.getElementById('reportContent').innerHTML = '<p class="text-center text-muted" style="padding: 40px;">No students found matching the filters</p>';
+        return;
+      }
+      
+      document.getElementById('reportTitle').textContent = `Student List Report (${data.length} students)`;
+      
+      const html = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Adm No</th>
+              <th>Name</th>
+              <th>Class</th>
+              <th>Gender</th>
+              <th>DOB</th>
+              <th>Parent Phone</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(student => `
+              <tr>
+                <td>${student.admission_no}</td>
+                <td><strong>${student.first_name} ${student.last_name}</strong></td>
+                <td>${student.classes?.name || '-'}</td>
+                <td>${student.gender || '-'}</td>
+                <td>${student.date_of_birth ? formatDate(student.date_of_birth) : '-'}</td>
+                <td>${student.parent_phone || '-'}</td>
+                <td>${student.active ? '<span style="color: var(--success);">✓ Active</span>' : '<span style="color: var(--danger);">✗ Inactive</span>'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      
+      document.getElementById('reportContent').innerHTML = html;
+    }
+    
+    window.exportReport = function() {
+      if (currentData.length === 0) {
+        showToast('No data to export', 'warning');
+        return;
+      }
+      
+      const exportData = currentData.map(s => ({
+        'Admission No': s.admission_no,
+        'First Name': s.first_name,
+        'Last Name': s.last_name,
+        'Class': s.classes?.name || '',
+        'Gender': s.gender || '',
+        'Date of Birth': s.date_of_birth || '',
+        'Parent Name': s.parent_name || '',
+        'Parent Phone': s.parent_phone || '',
+        'Status': s.active ? 'Active' : 'Inactive'
+      }));
+      
+      exportToExcel(exportData, 'student-report');
+    }
+    
+    init();
+  </script>
+</body>
+</html>
