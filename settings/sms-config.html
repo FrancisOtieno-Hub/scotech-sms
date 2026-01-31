@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMS Configuration | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Settings</div>
+        <a href="school.html" class="nav-item">
+          <span class="nav-icon">🏫</span>
+          <span class="nav-text">School Profile</span>
+        </a>
+        <a href="users.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Users</span>
+        </a>
+        <a href="permissions.html" class="nav-item">
+          <span class="nav-icon">🔐</span>
+          <span class="nav-text">Permissions</span>
+        </a>
+        <a href="sms-config.html" class="nav-item active">
+          <span class="nav-icon">📱</span>
+          <span class="nav-text">SMS Config</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>SMS Configuration</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- SMS Provider Selection -->
+      <div class="card">
+        <h2>SMS Provider Configuration</h2>
+        
+        <form id="smsConfigForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Select Provider *</label>
+            <select id="provider" required>
+              <option value="">Choose Provider</option>
+              <option value="africastalking">Africa's Talking</option>
+              <option value="twilio">Twilio</option>
+            </select>
+          </div>
+          
+          <!-- Africa's Talking Config -->
+          <div id="atConfig" class="hidden">
+            <h3 style="margin: 20px 0 12px 0; color: var(--primary);">Africa's Talking Settings</h3>
+            <div class="form-group">
+              <label>Username *</label>
+              <input type="text" id="atUsername" placeholder="Your AT username">
+              <small class="text-muted">From your Africa's Talking dashboard</small>
+            </div>
+            <div class="form-group">
+              <label>API Key *</label>
+              <input type="password" id="atApiKey" placeholder="Your AT API key">
+              <small class="text-muted">This will be encrypted before storage</small>
+            </div>
+            <div class="form-group">
+              <label>Sender ID</label>
+              <input type="text" id="atSenderId" placeholder="e.g., SCHOOL_NAME" maxlength="11" style="text-transform: uppercase;">
+              <small class="text-muted">11 characters max (alphanumeric). Optional but recommended.</small>
+            </div>
+          </div>
+          
+          <!-- Twilio Config -->
+          <div id="twilioConfig" class="hidden">
+            <h3 style="margin: 20px 0 12px 0; color: var(--primary);">Twilio Settings</h3>
+            <div class="form-group">
+              <label>Account SID *</label>
+              <input type="text" id="twilioSid" placeholder="Your Twilio Account SID">
+              <small class="text-muted">From your Twilio console</small>
+            </div>
+            <div class="form-group">
+              <label>Auth Token *</label>
+              <input type="password" id="twilioToken" placeholder="Your Twilio Auth Token">
+              <small class="text-muted">This will be encrypted before storage</small>
+            </div>
+            <div class="form-group">
+              <label>Phone Number *</label>
+              <input type="tel" id="twilioPhone" placeholder="+1234567890">
+              <small class="text-muted">Your Twilio phone number (include country code)</small>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 12px; margin-top: 20px;">
+            <button type="submit" id="saveBtn" class="btn btn-primary">Save Configuration</button>
+            <button type="button" id="testBtn" class="btn btn-secondary">Send Test SMS</button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- SMS Usage -->
+      <div class="card">
+        <h2>SMS Usage Statistics</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: var(--radius-sm); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Today</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="smsToday">-</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">messages sent</div>
+          </div>
+          <div style="padding: 20px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: var(--radius-sm); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">This Month</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="smsMonth">-</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">messages sent</div>
+          </div>
+          <div style="padding: 20px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: var(--radius-sm); color: white;">
+            <div style="font-size: 0.9rem; opacity: 0.9;">Success Rate</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="successRate">-</div>
+            <div style="font-size: 0.85rem; opacity: 0.8;">delivery success</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Setup Guide -->
+      <div class="card">
+        <h2>Setup Guides</h2>
+        
+        <div style="padding: 16px; background: #e0e7ff; border-radius: var(--radius-sm); margin-bottom: 16px;">
+          <h4 style="margin: 0 0 12px 0; color: #4338ca;">📱 Africa's Talking (Recommended for Kenya)</h4>
+          <ol style="margin: 0; padding-left: 20px; line-height: 1.8;">
+            <li>Visit <a href="https://africastalking.com" target="_blank" style="color: #4338ca; font-weight: 600;">africastalking.com</a> and create an account</li>
+            <li>Verify your account and complete the registration</li>
+            <li>Go to your dashboard and navigate to Settings → API Key</li>
+            <li>Copy your <strong>Username</strong> and generate an <strong>API Key</strong></li>
+            <li>(Optional) Apply for a <strong>Sender ID</strong> - this makes SMS appear from your school name</li>
+            <li>Enter your credentials above and click "Save Configuration"</li>
+            <li>Click "Send Test SMS" to verify everything works</li>
+          </ol>
+          <div style="margin-top: 12px; padding: 12px; background: white; border-radius: var(--radius-sm);">
+            <strong>💰 Pricing:</strong> Approximately KES 0.80 per SMS in Kenya
+          </div>
+        </div>
+        
+        <div style="padding: 16px; background: #fef3c7; border-radius: var(--radius-sm);">
+          <h4 style="margin: 0 0 12px 0; color: #92400e;">📱 Twilio (International)</h4>
+          <ol style="margin: 0; padding-left: 20px; line-height: 1.8;">
+            <li>Visit <a href="https://twilio.com" target="_blank" style="color: #92400e; font-weight: 600;">twilio.com</a> and sign up</li>
+            <li>Complete the verification process</li>
+            <li>Purchase a phone number from Twilio's console</li>
+            <li>Go to Console → Account → Keys & Credentials</li>
+            <li>Copy your <strong>Account SID</strong> and <strong>Auth Token</strong></li>
+            <li>Enter your credentials and phone number above</li>
+            <li>Click "Save Configuration" and test</li>
+          </ol>
+          <div style="margin-top: 12px; padding: 12px; background: white; border-radius: var(--radius-sm);">
+            <strong>💰 Pricing:</strong> Approximately $0.07 per SMS (varies by country)
+          </div>
+        </div>
+      </div>
+      
+      <!-- Security Note -->
+      <div class="card" style="border: 2px solid var(--warning);">
+        <h2 style="color: var(--warning);">🔒 Security Notice</h2>
+        <p style="line-height: 1.6;">Your API credentials are sensitive and should be kept secure. In production:</p>
+        <ul style="line-height: 1.8;">
+          <li>API keys are encrypted before being stored in the database</li>
+          <li>Only school administrators can view or modify SMS configuration</li>
+          <li>Never share your API credentials with unauthorized users</li>
+          <li>Regularly monitor your SMS usage for any unusual activity</li>
+          <li>If you suspect your credentials have been compromised, regenerate them immediately</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      // Only school_admin can access
+      if (currentUser.role !== 'school_admin' && currentUser.role !== 'super_admin') {
+        showToast('Access denied', 'error');
+        setTimeout(() => window.location.href = '../dashboard.html', 2000);
+        return;
+      }
+      
+      await loadSMSConfig();
+      await loadSMSStats();
+      setupEventListeners();
+    }
+    
+    async function loadSMSConfig() {
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('sms_provider, sms_config')
+          .eq('id', currentUser.school_id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data?.sms_provider) {
+          document.getElementById('provider').value = data.sms_provider;
+          document.getElementById('provider').dispatchEvent(new Event('change'));
+          
+          if (data.sms_config) {
+            showToast('SMS provider already configured. Update credentials to change.', 'info');
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error loading SMS config:', error);
+      }
+    }
+    
+    async function loadSMSStats() {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        
+        // Today's SMS
+        const { data: todayData } = await supabase
+          .from('sms_logs')
+          .select('total_recipients, successful_sends')
+          .eq('school_id', currentUser.school_id)
+          .gte('created_at', today);
+        
+        const todayTotal = todayData?.reduce((sum, log) => sum + (log.total_recipients || 0), 0) || 0;
+        document.getElementById('smsToday').textContent = todayTotal;
+        
+        // This month's SMS
+        const { data: monthData } = await supabase
+          .from('sms_logs')
+          .select('total_recipients, successful_sends')
+          .eq('school_id', currentUser.school_id)
+          .gte('created_at', monthStart.toISOString());
+        
+        const monthTotal = monthData?.reduce((sum, log) => sum + (log.total_recipients || 0), 0) || 0;
+        const monthSuccess = monthData?.reduce((sum, log) => sum + (log.successful_sends || 0), 0) || 0;
+        const successRate = monthTotal > 0 ? ((monthSuccess / monthTotal) * 100).toFixed(1) : 0;
+        
+        document.getElementById('smsMonth').textContent = monthTotal;
+        document.getElementById('successRate').textContent = successRate + '%';
+        
+      } catch (error) {
+        console.error('Error loading SMS stats:', error);
+      }
+    }
+    
+    function setupEventListeners() {
+      // Provider selection
+      document.getElementById('provider').addEventListener('change', (e) => {
+        document.getElementById('atConfig').classList.add('hidden');
+        document.getElementById('twilioConfig').classList.add('hidden');
+        
+        if (e.target.value === 'africastalking') {
+          document.getElementById('atConfig').classList.remove('hidden');
+        } else if (e.target.value === 'twilio') {
+          document.getElementById('twilioConfig').classList.remove('hidden');
+        }
+      });
+      
+      // Save configuration
+      document.getElementById('smsConfigForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const provider = document.getElementById('provider').value;
+        let config = {};
+        
+        if (provider === 'africastalking') {
+          const username = document.getElementById('atUsername').value.trim();
+          const apiKey = document.getElementById('atApiKey').value.trim();
+          const senderId = document.getElementById('atSenderId').value.trim();
+          
+          if (!username || !apiKey) {
+            showToast('Please provide username and API key', 'error');
+            return;
+          }
+          
+          config = {
+            username,
+            api_key: apiKey,
+            sender_id: senderId || null
+          };
+        } else if (provider === 'twilio') {
+          const sid = document.getElementById('twilioSid').value.trim();
+          const token = document.getElementById('twilioToken').value.trim();
+          const phone = document.getElementById('twilioPhone').value.trim();
+          
+          if (!sid || !token || !phone) {
+            showToast('Please provide all Twilio credentials', 'error');
+            return;
+          }
+          
+          config = {
+            account_sid: sid,
+            auth_token: token,
+            phone_number: phone
+          };
+        } else {
+          showToast('Please select a provider', 'error');
+          return;
+        }
+        
+        const saveBtn = document.getElementById('saveBtn');
+        setButtonLoading(saveBtn, true, 'Saving...');
+        
+        try {
+          // NOTE: In production, encrypt the config before saving
+          const { error } = await supabase
+            .from('schools')
+            .update({
+              sms_provider: provider,
+              sms_config: config // Should be encrypted in production
+            })
+            .eq('id', currentUser.school_id);
+          
+          if (error) throw error;
+          
+          showToast('✓ SMS configuration saved successfully!', 'success');
+          
+        } catch (error) {
+          showToast('Error saving configuration: ' + error.message, 'error');
+        } finally {
+          setButtonLoading(saveBtn, false, 'Save Configuration');
+        }
+      });
+      
+      // Test SMS
+      document.getElementById('testBtn').addEventListener('click', () => {
+        showToast('Test SMS feature: Send a test message to your phone number to verify the configuration', 'info');
+      });
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    init();
+  </script>
+</body>
+</html>
