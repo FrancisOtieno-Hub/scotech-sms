@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMS Templates | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Communication</div>
+        <a href="sms.html" class="nav-item">
+          <span class="nav-icon">📱</span>
+          <span class="nav-text">Send SMS</span>
+        </a>
+        <a href="templates.html" class="nav-item active">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Templates</span>
+        </a>
+        <a href="history.html" class="nav-item">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">History</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>SMS Templates</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Info Card -->
+      <div style="padding: 16px; background: #e0e7ff; border-radius: var(--radius-sm); margin-bottom: 20px;">
+        <strong>ℹ️ About Templates</strong>
+        <p style="margin: 8px 0 0 0;">Create reusable SMS templates for common messages like fee reminders, event notifications, and general announcements. Variables like {STUDENT_NAME}, {PARENT_NAME}, and {SCHOOL_NAME} will be automatically replaced when sending.</p>
+      </div>
+      
+      <!-- Add Template Form -->
+      <div class="card">
+        <h2>Create New Template</h2>
+        
+        <form id="templateForm" style="max-width: 600px;">
+          <div class="form-group">
+            <label>Template Name *</label>
+            <input type="text" id="templateName" required placeholder="e.g., Fee Reminder">
+          </div>
+          
+          <div class="form-group">
+            <label>Category</label>
+            <select id="category">
+              <option value="fees">Fees & Payments</option>
+              <option value="events">Events & Activities</option>
+              <option value="announcements">Announcements</option>
+              <option value="reminders">Reminders</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Message Template *</label>
+            <textarea id="message" rows="6" maxlength="480" required placeholder="Type your template message here..."></textarea>
+            <small class="text-muted">Maximum 480 characters. Use variables: {STUDENT_NAME}, {PARENT_NAME}, {SCHOOL_NAME}, {AMOUNT}, {DATE}</small>
+            <div style="margin-top: 8px;">
+              <span id="charCount" style="font-weight: 600;">0 / 480</span>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 12px;">
+            <button type="submit" id="saveBtn" class="btn btn-primary">💾 Save Template</button>
+            <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear</button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- Templates List -->
+      <div class="card">
+        <h2>Saved Templates</h2>
+        <div id="templatesContainer"></div>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 600px; width: 90%;">
+      <h2>Edit Template</h2>
+      <form id="editForm">
+        <input type="hidden" id="editTemplateId">
+        <div class="form-group">
+          <label>Template Name</label>
+          <input type="text" id="editName" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="editCategory">
+            <option value="fees">Fees & Payments</option>
+            <option value="events">Events & Activities</option>
+            <option value="announcements">Announcements</option>
+            <option value="reminders">Reminders</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea id="editMessage" rows="6" required></textarea>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadTemplates();
+      setupEventListeners();
+    }
+    
+    function setupEventListeners() {
+      // Character count
+      document.getElementById('message').addEventListener('input', () => {
+        updateCharCount('message', 'charCount');
+      });
+      
+      // Form submit
+      document.getElementById('templateForm').addEventListener('submit', saveTemplate);
+      
+      // Edit form
+      document.getElementById('editForm').addEventListener('submit', updateTemplate);
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    function updateCharCount(textareaId, countId) {
+      const count = document.getElementById(textareaId).value.length;
+      document.getElementById(countId).textContent = `${count} / 480`;
+    }
+    
+    async function saveTemplate(e) {
+      e.preventDefault();
+      
+      const templateData = {
+        school_id: currentUser.school_id,
+        name: document.getElementById('templateName').value.trim(),
+        category: document.getElementById('category').value,
+        message: document.getElementById('message').value.trim()
+      };
+      
+      const saveBtn = document.getElementById('saveBtn');
+      setButtonLoading(saveBtn, true, 'Saving...');
+      
+      try {
+        const { error } = await supabase
+          .from('sms_templates')
+          .insert([templateData]);
+        
+        if (error) throw error;
+        
+        showToast('✓ Template saved successfully!', 'success');
+        
+        // Reset form
+        document.getElementById('templateForm').reset();
+        document.getElementById('charCount').textContent = '0 / 480';
+        
+        await loadTemplates();
+        
+      } catch (error) {
+        showToast('Error saving template: ' + error.message, 'error');
+      } finally {
+        setButtonLoading(saveBtn, false, '💾 Save Template');
+      }
+    }
+    
+    async function loadTemplates() {
+      try {
+        const { data, error } = await supabase
+          .from('sms_templates')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .order('category')
+          .order('name');
+        
+        if (error) throw error;
+        
+        const container = document.getElementById('templatesContainer');
+        
+        if (!data || data.length === 0) {
+          container.innerHTML = '<p class="text-center text-muted" style="padding: 40px;">No templates created yet</p>';
+          return;
+        }
+        
+        // Group by category
+        const grouped = data.reduce((acc, template) => {
+          if (!acc[template.category]) {
+            acc[template.category] = [];
+          }
+          acc[template.category].push(template);
+          return acc;
+        }, {});
+        
+        const categoryLabels = {
+          fees: '💰 Fees & Payments',
+          events: '🎉 Events & Activities',
+          announcements: '📢 Announcements',
+          reminders: '⏰ Reminders',
+          other: '📝 Other'
+        };
+        
+        let html = '';
+        
+        Object.keys(grouped).forEach(category => {
+          html += `<h3 style="margin: 24px 0 12px 0; color: var(--primary);">${categoryLabels[category] || category}</h3>`;
+          
+          grouped[category].forEach(template => {
+            html += `
+              <div style="padding: 16px; margin-bottom: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                  <h4 style="margin: 0;">${template.name}</h4>
+                  <div class="action-buttons">
+                    <button class="btn-icon" onclick="useTemplate('${template.id}')" title="Use Template">📱</button>
+                    <button class="btn-icon" onclick="editTemplate('${template.id}')" title="Edit">✏️</button>
+                    <button class="btn-icon" onclick="deleteTemplate('${template.id}', '${template.name}')" title="Delete">🗑️</button>
+                  </div>
+                </div>
+                <p style="margin: 0; line-height: 1.6; color: var(--text-secondary);">${template.message}</p>
+              </div>
+            `;
+          });
+        });
+        
+        container.innerHTML = html;
+        
+      } catch (error) {
+        showToast('Error loading templates: ' + error.message, 'error');
+      }
+    }
+    
+    window.useTemplate = function(templateId) {
+      localStorage.setItem('selectedTemplateId', templateId);
+      window.location.href = 'sms.html';
+    }
+    
+    window.editTemplate = async function(templateId) {
+      const { data } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+      
+      if (data) {
+        document.getElementById('editTemplateId').value = data.id;
+        document.getElementById('editName').value = data.name;
+        document.getElementById('editCategory').value = data.category;
+        document.getElementById('editMessage').value = data.message;
+        document.getElementById('editModal').classList.remove('hidden');
+      }
+    }
+    
+    window.closeEditModal = function() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+    
+    async function updateTemplate(e) {
+      e.preventDefault();
+      
+      const updates = {
+        name: document.getElementById('editName').value.trim(),
+        category: document.getElementById('editCategory').value,
+        message: document.getElementById('editMessage').value.trim()
+      };
+      
+      try {
+        const { error } = await supabase
+          .from('sms_templates')
+          .update(updates)
+          .eq('id', document.getElementById('editTemplateId').value);
+        
+        if (error) throw error;
+        
+        showToast('Template updated successfully!', 'success');
+        closeEditModal();
+        await loadTemplates();
+        
+      } catch (error) {
+        showToast('Error updating template: ' + error.message, 'error');
+      }
+    }
+    
+    window.deleteTemplate = async function(templateId, templateName) {
+      if (!confirm(`Delete template "${templateName}"?`)) return;
+      
+      try {
+        const { error } = await supabase
+          .from('sms_templates')
+          .delete()
+          .eq('id', templateId);
+        
+        if (error) throw error;
+        
+        showToast('Template deleted', 'success');
+        await loadTemplates();
+        
+      } catch (error) {
+        showToast('Error deleting template: ' + error.message, 'error');
+      }
+    }
+    
+    window.clearForm = function() {
+      document.getElementById('templateForm').reset();
+      document.getElementById('charCount').textContent = '0 / 480';
+    }
+    
+    init();
+  </script>
+</body>
+</html>
