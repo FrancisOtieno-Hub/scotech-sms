@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMS History | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Communication</div>
+        <a href="sms.html" class="nav-item">
+          <span class="nav-icon">📱</span>
+          <span class="nav-text">Send SMS</span>
+        </a>
+        <a href="templates.html" class="nav-item">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Templates</span>
+        </a>
+        <a href="history.html" class="nav-item active">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">History</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>SMS History</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Filters -->
+      <div class="card">
+        <h2>Filters</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label>Date Range</label>
+            <select id="dateFilter">
+              <option value="week">Last 7 Days</option>
+              <option value="month" selected>Last 30 Days</option>
+              <option value="quarter">Last 3 Months</option>
+              <option value="year">Last Year</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="statusFilter">
+              <option value="">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          <div style="display: flex; align-items: end;">
+            <button class="btn btn-primary btn-block" id="filterBtn">Apply Filters</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Summary Stats -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;" id="summaryStats"></div>
+      
+      <!-- History Table -->
+      <div class="card">
+        <h2>SMS Logs</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date & Time</th>
+              <th>Type</th>
+              <th>Recipients</th>
+              <th>Successful</th>
+              <th>Failed</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="7" class="text-center text-muted">Loading history...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <!-- View Message Modal -->
+  <div id="messageModal" class="modal hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--spacing-xl); max-width: 600px; width: 90%;">
+      <h2>Message Details</h2>
+      <div id="messageContent" style="margin: 20px 0;"></div>
+      <button class="btn btn-secondary" onclick="closeMessageModal()">Close</button>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatDate } from '../js/config.js';
+    
+    let currentUser = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await loadHistory();
+      setupEventListeners();
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('filterBtn').addEventListener('click', loadHistory);
+      
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    async function loadHistory() {
+      try {
+        const dateFilter = document.getElementById('dateFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        // Calculate date range
+        const now = new Date();
+        let startDate;
+        
+        if (dateFilter === 'week') {
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (dateFilter === 'month') {
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else if (dateFilter === 'quarter') {
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        } else if (dateFilter === 'year') {
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        } else {
+          startDate = new Date('2020-01-01');
+        }
+        
+        let query = supabase
+          .from('sms_logs')
+          .select('*')
+          .eq('school_id', currentUser.school_id)
+          .gte('created_at', startDate.toISOString())
+          .order('created_at', { ascending: false });
+        
+        if (statusFilter) {
+          query = query.eq('status', statusFilter);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        displaySummary(data || []);
+        displayHistory(data || []);
+        
+      } catch (error) {
+        showToast('Error loading history: ' + error.message, 'error');
+      }
+    }
+    
+    function displaySummary(data) {
+      const totalRecipients = data.reduce((sum, log) => sum + (log.total_recipients || 0), 0);
+      const totalSuccessful = data.reduce((sum, log) => sum + (log.successful_sends || 0), 0);
+      const totalFailed = data.reduce((sum, log) => sum + (log.failed_sends || 0), 0);
+      const successRate = totalRecipients > 0 ? ((totalSuccessful / totalRecipients) * 100).toFixed(1) : 0;
+      
+      document.getElementById('summaryStats').innerHTML = `
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+          <div class="text-muted" style="font-size: 0.85rem;">Total Messages</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${data.length}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--info);">
+          <div class="text-muted" style="font-size: 0.85rem;">Recipients</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${totalRecipients}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--success);">
+          <div class="text-muted" style="font-size: 0.85rem;">Successful</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${totalSuccessful}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--danger);">
+          <div class="text-muted" style="font-size: 0.85rem;">Failed</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${totalFailed}</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--warning);">
+          <div class="text-muted" style="font-size: 0.85rem;">Success Rate</div>
+          <div style="font-size: 1.8rem; font-weight: 700;">${successRate}%</div>
+        </div>
+      `;
+    }
+    
+    function displayHistory(data) {
+      const tbody = document.getElementById('historyBody');
+      
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No SMS history found</td></tr>';
+        return;
+      }
+      
+      const typeLabels = {
+        all: 'All Parents',
+        class: 'Specific Class',
+        custom: 'Custom List'
+      };
+      
+      tbody.innerHTML = data.map(log => {
+        const statusBadge = log.status === 'completed' 
+          ? '<span style="background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">✓ Completed</span>'
+          : log.status === 'pending'
+          ? '<span style="background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">⏳ Pending</span>'
+          : '<span style="background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem;">✗ Failed</span>';
+        
+        const successRate = log.total_recipients > 0 
+          ? ((log.successful_sends || 0) / log.total_recipients * 100).toFixed(0) 
+          : 0;
+        
+        return `
+          <tr>
+            <td>${formatDate(log.created_at)}</td>
+            <td>${typeLabels[log.message_type] || log.message_type}</td>
+            <td><strong>${log.total_recipients || 0}</strong></td>
+            <td style="color: var(--success);">${log.successful_sends || 0}</td>
+            <td style="color: var(--danger);">${log.failed_sends || 0}</td>
+            <td>${statusBadge}</td>
+            <td>
+              <button class="btn-icon" onclick="viewMessage('${log.id}')" title="View Message">👁️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
+    window.viewMessage = async function(logId) {
+      const { data } = await supabase
+        .from('sms_logs')
+        .select('*')
+        .eq('id', logId)
+        .single();
+      
+      if (data) {
+        const typeLabels = {
+          all: 'All Parents',
+          class: 'Specific Class',
+          custom: 'Custom List'
+        };
+        
+        document.getElementById('messageContent').innerHTML = `
+          <div style="display: grid; gap: 12px;">
+            <div><strong>Date:</strong> ${formatDate(data.created_at)}</div>
+            <div><strong>Type:</strong> ${typeLabels[data.message_type] || data.message_type}</div>
+            <div><strong>Recipients:</strong> ${data.total_recipients || 0}</div>
+            <div><strong>Successful:</strong> <span style="color: var(--success);">${data.successful_sends || 0}</span></div>
+            <div><strong>Failed:</strong> <span style="color: var(--danger);">${data.failed_sends || 0}</span></div>
+            <div><strong>Status:</strong> ${data.status}</div>
+            <div style="margin-top: 12px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+              <strong>Message:</strong>
+              <p style="margin: 8px 0 0 0; line-height: 1.6;">${data.message_content}</p>
+            </div>
+          </div>
+        `;
+        
+        document.getElementById('messageModal').classList.remove('hidden');
+      }
+    }
+    
+    window.closeMessageModal = function() {
+      document.getElementById('messageModal').classList.add('hidden');
+    }
+    
+    init();
+  </script>
+</body>
+</html>
