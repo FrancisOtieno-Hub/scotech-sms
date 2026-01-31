@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Report Builder | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Reports</div>
+        <a href="dashboard.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics Dashboard</span>
+        </a>
+        <a href="students.html" class="nav-item">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Student Reports</span>
+        </a>
+        <a href="finance.html" class="nav-item">
+          <span class="nav-icon">💰</span>
+          <span class="nav-text">Financial Reports</span>
+        </a>
+        <a href="custom.html" class="nav-item active">
+          <span class="nav-icon">🔧</span>
+          <span class="nav-text">Custom Reports</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Custom Report Builder</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-secondary" onclick="exportCustomReport()">📥 Export</button>
+        <button class="btn btn-sm btn-secondary" onclick="window.print()">🖨️ Print</button>
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- Report Builder -->
+      <div class="card">
+        <h2>Build Your Custom Report</h2>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+          <!-- Data Source -->
+          <div class="form-group">
+            <label>Data Source *</label>
+            <select id="dataSource" required>
+              <option value="">Select data source...</option>
+              <option value="students">Students</option>
+              <option value="payments">Payments</option>
+              <option value="expenses">Expenses</option>
+              <option value="staff">Staff</option>
+              <option value="sms">SMS Logs</option>
+            </select>
+          </div>
+          
+          <!-- Fields to Include -->
+          <div class="form-group">
+            <label>Fields to Include</label>
+            <div id="fieldsContainer" style="padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); min-height: 100px;">
+              <p class="text-muted">Select a data source first</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Filters -->
+        <div id="filtersSection" class="hidden" style="margin-top: 20px;">
+          <h3 style="margin-bottom: 12px;">Filters</h3>
+          <div id="filtersContainer" style="display: grid; gap: 12px;"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addFilter()" style="margin-top: 12px;">+ Add Filter</button>
+        </div>
+        
+        <!-- Actions -->
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button class="btn btn-primary" id="runReportBtn">▶️ Run Report</button>
+          <button class="btn btn-secondary" onclick="clearBuilder()">🗑️ Clear</button>
+        </div>
+      </div>
+      
+      <!-- Results -->
+      <div id="resultsCard" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2>Report Results (<span id="resultCount">0</span> records)</h2>
+        </div>
+        <div id="resultsContent"></div>
+      </div>
+      
+      <!-- Saved Reports -->
+      <div class="card">
+        <h2>Saved Reports</h2>
+        <div id="savedReports">
+          <p class="text-muted">No saved reports yet. Build and save a report to see it here.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, formatCurrency, formatDate, exportToExcel } from '../js/config.js';
+    
+    let currentUser = null;
+    let selectedFields = [];
+    let currentData = [];
+    let filters = [];
+    
+    const fieldDefinitions = {
+      students: [
+        { id: 'admission_no', label: 'Admission Number' },
+        { id: 'first_name', label: 'First Name' },
+        { id: 'last_name', label: 'Last Name' },
+        { id: 'gender', label: 'Gender' },
+        { id: 'date_of_birth', label: 'Date of Birth' },
+        { id: 'class_id', label: 'Class' },
+        { id: 'parent_name', label: 'Parent Name' },
+        { id: 'parent_phone', label: 'Parent Phone' },
+        { id: 'active', label: 'Status' }
+      ],
+      payments: [
+        { id: 'payment_date', label: 'Payment Date' },
+        { id: 'amount', label: 'Amount' },
+        { id: 'payment_method', label: 'Payment Method' },
+        { id: 'reference_no', label: 'Reference Number' },
+        { id: 'learner_id', label: 'Student ID' }
+      ],
+      expenses: [
+        { id: 'expense_date', label: 'Expense Date' },
+        { id: 'amount', label: 'Amount' },
+        { id: 'category_id', label: 'Category' },
+        { id: 'description', label: 'Description' },
+        { id: 'vendor', label: 'Vendor' },
+        { id: 'payment_method', label: 'Payment Method' },
+        { id: 'status', label: 'Status' }
+      ],
+      staff: [
+        { id: 'staff_no', label: 'Staff Number' },
+        { id: 'first_name', label: 'First Name' },
+        { id: 'last_name', label: 'Last Name' },
+        { id: 'position', label: 'Position' },
+        { id: 'department_id', label: 'Department' },
+        { id: 'employment_type', label: 'Employment Type' },
+        { id: 'phone', label: 'Phone' },
+        { id: 'active', label: 'Status' }
+      ],
+      sms: [
+        { id: 'created_at', label: 'Date Sent' },
+        { id: 'message_type', label: 'Message Type' },
+        { id: 'total_recipients', label: 'Recipients' },
+        { id: 'successful_sends', label: 'Successful' },
+        { id: 'status', label: 'Status' }
+      ]
+    };
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      setupEventListeners();
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('dataSource').addEventListener('change', (e) => {
+        if (e.target.value) {
+          loadFields(e.target.value);
+          document.getElementById('filtersSection').classList.remove('hidden');
+        } else {
+          document.getElementById('fieldsContainer').innerHTML = '<p class="text-muted">Select a data source first</p>';
+          document.getElementById('filtersSection').classList.add('hidden');
+        }
+      });
+      
+      document.getElementById('runReportBtn').addEventListener('click', runCustomReport);
+      
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    function loadFields(dataSource) {
+      const fields = fieldDefinitions[dataSource] || [];
+      selectedFields = [];
+      
+      const html = fields.map(field => `
+        <label style="display: flex; align-items: center; gap: 8px; padding: 8px; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--transition);"
+               onmouseover="this.style.background='var(--bg-primary)'" 
+               onmouseout="this.style.background='transparent'">
+          <input type="checkbox" value="${field.id}" onchange="toggleField('${field.id}', this.checked)">
+          <span>${field.label}</span>
+        </label>
+      `).join('');
+      
+      document.getElementById('fieldsContainer').innerHTML = html;
+    }
+    
+    window.toggleField = function(fieldId, checked) {
+      if (checked) {
+        if (!selectedFields.includes(fieldId)) {
+          selectedFields.push(fieldId);
+        }
+      } else {
+        selectedFields = selectedFields.filter(f => f !== fieldId);
+      }
+    }
+    
+    window.addFilter = function() {
+      const dataSource = document.getElementById('dataSource').value;
+      if (!dataSource) return;
+      
+      const filterId = 'filter_' + Date.now();
+      const fields = fieldDefinitions[dataSource];
+      
+      const filterHtml = `
+        <div id="${filterId}" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm);">
+          <select class="filter-field">
+            <option value="">Select field...</option>
+            ${fields.map(f => `<option value="${f.id}">${f.label}</option>`).join('')}
+          </select>
+          <select class="filter-operator">
+            <option value="equals">Equals</option>
+            <option value="contains">Contains</option>
+            <option value="greater">Greater than</option>
+            <option value="less">Less than</option>
+          </select>
+          <input type="text" class="filter-value" placeholder="Value...">
+          <button class="btn btn-sm btn-danger" onclick="removeFilter('${filterId}')">✕</button>
+        </div>
+      `;
+      
+      document.getElementById('filtersContainer').insertAdjacentHTML('beforeend', filterHtml);
+    }
+    
+    window.removeFilter = function(filterId) {
+      document.getElementById(filterId).remove();
+    }
+    
+    window.clearBuilder = function() {
+      document.getElementById('dataSource').value = '';
+      selectedFields = [];
+      document.getElementById('fieldsContainer').innerHTML = '<p class="text-muted">Select a data source first</p>';
+      document.getElementById('filtersContainer').innerHTML = '';
+      document.getElementById('filtersSection').classList.add('hidden');
+      document.getElementById('resultsCard').classList.add('hidden');
+    }
+    
+    async function runCustomReport() {
+      const dataSource = document.getElementById('dataSource').value;
+      
+      if (!dataSource) {
+        showToast('Please select a data source', 'error');
+        return;
+      }
+      
+      if (selectedFields.length === 0) {
+        showToast('Please select at least one field', 'error');
+        return;
+      }
+      
+      try {
+        let query = supabase
+          .from(dataSource === 'students' ? 'learners' : dataSource)
+          .select(selectedFields.join(', '))
+          .eq('school_id', currentUser.school_id);
+        
+        // Apply filters
+        const filterElements = document.querySelectorAll('#filtersContainer > div');
+        filterElements.forEach(filterEl => {
+          const field = filterEl.querySelector('.filter-field').value;
+          const operator = filterEl.querySelector('.filter-operator').value;
+          const value = filterEl.querySelector('.filter-value').value;
+          
+          if (field && value) {
+            if (operator === 'equals') {
+              query = query.eq(field, value);
+            } else if (operator === 'contains') {
+              query = query.ilike(field, `%${value}%`);
+            } else if (operator === 'greater') {
+              query = query.gt(field, value);
+            } else if (operator === 'less') {
+              query = query.lt(field, value);
+            }
+          }
+        });
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        currentData = data || [];
+        displayCustomResults(currentData);
+        
+      } catch (error) {
+        showToast('Error running report: ' + error.message, 'error');
+      }
+    }
+    
+    function displayCustomResults(data) {
+      document.getElementById('resultCount').textContent = data.length;
+      document.getElementById('resultsCard').classList.remove('hidden');
+      
+      if (data.length === 0) {
+        document.getElementById('resultsContent').innerHTML = '<p class="text-center text-muted" style="padding: 40px;">No results found</p>';
+        return;
+      }
+      
+      const headers = selectedFields;
+      
+      const html = `
+        <div style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                ${headers.map(h => `<th>${h.replace(/_/g, ' ').toUpperCase()}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(row => `
+                <tr>
+                  ${headers.map(h => {
+                    let value = row[h];
+                    if (value === null || value === undefined) value = '-';
+                    else if (typeof value === 'boolean') value = value ? '✓' : '✗';
+                    else if (h.includes('amount')) value = formatCurrency(value);
+                    else if (h.includes('date')) value = formatDate(value);
+                    return `<td>${value}</td>`;
+                  }).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.getElementById('resultsContent').innerHTML = html;
+    }
+    
+    window.exportCustomReport = function() {
+      if (currentData.length === 0) {
+        showToast('No data to export', 'warning');
+        return;
+      }
+      
+      const exportData = currentData.map(row => {
+        const obj = {};
+        selectedFields.forEach(field => {
+          obj[field.replace(/_/g, ' ').toUpperCase()] = row[field];
+        });
+        return obj;
+      });
+      
+      exportToExcel(exportData, 'custom-report');
+    }
+    
+    init();
+  </script>
+</body>
+</html>
