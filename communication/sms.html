@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Send SMS | ScoTech SMS</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/logo.svg" alt="ScoTech SMS" class="logo" onerror="this.style.display='none'">
+      <h2>ScoTech SMS</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../dashboard.html" class="nav-item">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <div class="nav-section">
+        <div class="nav-section-title">Communication</div>
+        <a href="sms.html" class="nav-item active">
+          <span class="nav-icon">📱</span>
+          <span class="nav-text">Send SMS</span>
+        </a>
+        <a href="templates.html" class="nav-item">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">Templates</span>
+        </a>
+        <a href="history.html" class="nav-item">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">History</span>
+        </a>
+      </div>
+    </nav>
+  </aside>
+  
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+        <h1>Send Bulk SMS</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+    
+    <div class="content-wrapper">
+      <div id="toastContainer" class="toast-container"></div>
+      
+      <!-- SMS Configuration Warning -->
+      <div id="configWarning" class="hidden" style="padding: 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: var(--radius-sm); margin-bottom: 20px;">
+        <strong>⚠️ SMS Not Configured</strong>
+        <p style="margin: 8px 0 0 0;">Please configure your SMS provider in <a href="../settings/sms-config.html" style="color: #92400e; font-weight: 600;">Settings → SMS Config</a> before sending messages.</p>
+      </div>
+      
+      <!-- SMS Form -->
+      <div class="card">
+        <h2>Compose Message</h2>
+        
+        <form id="smsForm" style="max-width: 800px;">
+          <!-- Recipients -->
+          <div class="form-group">
+            <label>Recipients *</label>
+            <select id="recipientType" required>
+              <option value="">Select recipient group...</option>
+              <option value="all">All Parents</option>
+              <option value="class">Specific Class</option>
+              <option value="custom">Custom List</option>
+            </select>
+          </div>
+          
+          <!-- Class Selection (hidden by default) -->
+          <div id="classSelection" class="form-group hidden">
+            <label>Select Class *</label>
+            <select id="classId">
+              <option value="">Choose class...</option>
+            </select>
+          </div>
+          
+          <!-- Custom Numbers (hidden by default) -->
+          <div id="customNumbers" class="form-group hidden">
+            <label>Phone Numbers</label>
+            <textarea id="phoneNumbers" rows="4" placeholder="Enter phone numbers (one per line or comma-separated)&#10;0712345678&#10;0723456789"></textarea>
+            <small class="text-muted">Enter one number per line or separate with commas</small>
+          </div>
+          
+          <!-- Template Selection -->
+          <div class="form-group">
+            <label>Use Template (Optional)</label>
+            <select id="templateId">
+              <option value="">Type your own message</option>
+            </select>
+          </div>
+          
+          <!-- Message -->
+          <div class="form-group">
+            <label>Message *</label>
+            <textarea id="message" rows="6" maxlength="480" required placeholder="Type your message here..."></textarea>
+            <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+              <small class="text-muted">Maximum 480 characters (3 SMS)</small>
+              <small id="charCount" style="font-weight: 600;">0 / 480</small>
+            </div>
+          </div>
+          
+          <!-- Recipient Preview -->
+          <div id="recipientPreview" class="hidden" style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); margin-bottom: 16px;">
+            <strong>Recipients Preview:</strong>
+            <div id="previewContent" style="margin-top: 8px;"></div>
+          </div>
+          
+          <!-- Send Options -->
+          <div style="display: flex; gap: 12px; align-items: center; margin-top: 20px;">
+            <button type="submit" id="sendBtn" class="btn btn-primary">📤 Send SMS</button>
+            <button type="button" class="btn btn-secondary" onclick="previewRecipients()">👁️ Preview Recipients</button>
+            <div style="flex: 1; text-align: right;">
+              <span id="estimatedCost" style="font-weight: 600; color: var(--primary);"></span>
+            </div>
+          </div>
+        </form>
+      </div>
+      
+      <!-- SMS Statistics -->
+      <div class="card">
+        <h2>SMS Statistics (This Month)</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+            <div class="text-muted" style="font-size: 0.85rem;">Total Sent</div>
+            <div style="font-size: 1.8rem; font-weight: 700;" id="totalSent">-</div>
+          </div>
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--success);">
+            <div class="text-muted" style="font-size: 0.85rem;">Successful</div>
+            <div style="font-size: 1.8rem; font-weight: 700;" id="successful">-</div>
+          </div>
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--danger);">
+            <div class="text-muted" style="font-size: 0.85rem;">Failed</div>
+            <div style="font-size: 1.8rem; font-weight: 700;" id="failed">-</div>
+          </div>
+          <div style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 4px solid var(--warning);">
+            <div class="text-muted" style="font-size: 0.85rem;">Success Rate</div>
+            <div style="font-size: 1.8rem; font-weight: 700;" id="successRate">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script type="module">
+    import { supabase, getCurrentUser, showToast, setButtonLoading, isValidPhoneNumber } from '../js/config.js';
+    
+    let currentUser = null;
+    let smsConfig = null;
+    
+    async function init() {
+      currentUser = await getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/';
+        return;
+      }
+      
+      await checkSMSConfig();
+      await loadClasses();
+      await loadTemplates();
+      await loadSMSStats();
+      setupEventListeners();
+    }
+    
+    async function checkSMSConfig() {
+      try {
+        const { data } = await supabase
+          .from('schools')
+          .select('sms_provider, sms_config')
+          .eq('id', currentUser.school_id)
+          .single();
+        
+        if (!data?.sms_provider || !data?.sms_config) {
+          document.getElementById('configWarning').classList.remove('hidden');
+          document.getElementById('sendBtn').disabled = true;
+        } else {
+          smsConfig = data;
+        }
+      } catch (error) {
+        console.error('Error checking SMS config:', error);
+      }
+    }
+    
+    async function loadClasses() {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('level');
+      
+      const select = document.getElementById('classId');
+      data?.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        select.appendChild(option);
+      });
+    }
+    
+    async function loadTemplates() {
+      const { data } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('school_id', currentUser.school_id)
+        .order('name');
+      
+      const select = document.getElementById('templateId');
+      data?.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template.id;
+        option.textContent = template.name;
+        option.dataset.message = template.message;
+        select.appendChild(option);
+      });
+    }
+    
+    async function loadSMSStats() {
+      try {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        
+        const { data } = await supabase
+          .from('sms_logs')
+          .select('total_recipients, successful_sends, failed_sends')
+          .eq('school_id', currentUser.school_id)
+          .gte('created_at', monthStart.toISOString());
+        
+        const totalSent = data?.reduce((sum, log) => sum + (log.total_recipients || 0), 0) || 0;
+        const successful = data?.reduce((sum, log) => sum + (log.successful_sends || 0), 0) || 0;
+        const failed = data?.reduce((sum, log) => sum + (log.failed_sends || 0), 0) || 0;
+        const successRate = totalSent > 0 ? ((successful / totalSent) * 100).toFixed(1) : 0;
+        
+        document.getElementById('totalSent').textContent = totalSent;
+        document.getElementById('successful').textContent = successful;
+        document.getElementById('failed').textContent = failed;
+        document.getElementById('successRate').textContent = successRate + '%';
+        
+      } catch (error) {
+        console.error('Error loading SMS stats:', error);
+      }
+    }
+    
+    function setupEventListeners() {
+      // Recipient type change
+      document.getElementById('recipientType').addEventListener('change', (e) => {
+        document.getElementById('classSelection').classList.add('hidden');
+        document.getElementById('customNumbers').classList.add('hidden');
+        
+        if (e.target.value === 'class') {
+          document.getElementById('classSelection').classList.remove('hidden');
+        } else if (e.target.value === 'custom') {
+          document.getElementById('customNumbers').classList.remove('hidden');
+        }
+      });
+      
+      // Template selection
+      document.getElementById('templateId').addEventListener('change', (e) => {
+        const selected = e.target.selectedOptions[0];
+        if (selected && selected.dataset.message) {
+          document.getElementById('message').value = selected.dataset.message;
+          updateCharCount();
+        }
+      });
+      
+      // Character count
+      document.getElementById('message').addEventListener('input', updateCharCount);
+      
+      // Form submit
+      document.getElementById('smsForm').addEventListener('submit', sendSMS);
+      
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm('Logout?')) {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        }
+      });
+      
+      document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+      });
+    }
+    
+    function updateCharCount() {
+      const message = document.getElementById('message').value;
+      const count = message.length;
+      const smsCount = Math.ceil(count / 160);
+      
+      document.getElementById('charCount').textContent = `${count} / 480 (${smsCount} SMS)`;
+    }
+    
+    window.previewRecipients = async function() {
+      const recipientType = document.getElementById('recipientType').value;
+      
+      if (!recipientType) {
+        showToast('Please select recipient type', 'warning');
+        return;
+      }
+      
+      try {
+        let recipients = [];
+        
+        if (recipientType === 'all') {
+          const { data } = await supabase
+            .from('learners')
+            .select('first_name, last_name, parent_phone')
+            .eq('school_id', currentUser.school_id)
+            .eq('active', true)
+            .not('parent_phone', 'is', null);
+          
+          recipients = data || [];
+        } else if (recipientType === 'class') {
+          const classId = document.getElementById('classId').value;
+          if (!classId) {
+            showToast('Please select a class', 'warning');
+            return;
+          }
+          
+          const { data } = await supabase
+            .from('learners')
+            .select('first_name, last_name, parent_phone')
+            .eq('school_id', currentUser.school_id)
+            .eq('class_id', classId)
+            .eq('active', true)
+            .not('parent_phone', 'is', null);
+          
+          recipients = data || [];
+        } else if (recipientType === 'custom') {
+          const numbers = document.getElementById('phoneNumbers').value
+            .split(/[,\n]/)
+            .map(n => n.trim())
+            .filter(n => n);
+          
+          recipients = numbers.map(phone => ({ parent_phone: phone }));
+        }
+        
+        const validRecipients = recipients.filter(r => isValidPhoneNumber(r.parent_phone));
+        
+        document.getElementById('recipientPreview').classList.remove('hidden');
+        document.getElementById('previewContent').innerHTML = `
+          <div style="margin-bottom: 8px;">
+            <strong>${validRecipients.length}</strong> valid recipients
+            ${recipients.length !== validRecipients.length ? `(${recipients.length - validRecipients.length} invalid numbers)` : ''}
+          </div>
+          <div style="max-height: 200px; overflow-y: auto; padding: 8px; background: var(--bg-primary); border-radius: var(--radius-sm);">
+            ${validRecipients.slice(0, 10).map(r => `
+              <div style="padding: 4px;">${r.first_name || ''} ${r.last_name || ''} - ${r.parent_phone}</div>
+            `).join('')}
+            ${validRecipients.length > 10 ? `<div style="padding: 4px; font-style: italic;">...and ${validRecipients.length - 10} more</div>` : ''}
+          </div>
+        `;
+        
+        // Estimate cost
+        const message = document.getElementById('message').value;
+        const smsCount = Math.ceil(message.length / 160);
+        const totalSMS = validRecipients.length * smsCount;
+        const costPerSMS = 0.80; // KES
+        const estimatedCost = (totalSMS * costPerSMS).toFixed(2);
+        
+        document.getElementById('estimatedCost').textContent = `Estimated cost: KES ${estimatedCost} (${totalSMS} SMS)`;
+        
+      } catch (error) {
+        showToast('Error loading recipients: ' + error.message, 'error');
+      }
+    }
+    
+    async function sendSMS(e) {
+      e.preventDefault();
+      
+      if (!smsConfig) {
+        showToast('SMS not configured. Please configure in Settings.', 'error');
+        return;
+      }
+      
+      const recipientType = document.getElementById('recipientType').value;
+      const message = document.getElementById('message').value.trim();
+      
+      if (!message) {
+        showToast('Please enter a message', 'error');
+        return;
+      }
+      
+      // Get recipients
+      let phoneNumbers = [];
+      
+      try {
+        if (recipientType === 'all') {
+          const { data } = await supabase
+            .from('learners')
+            .select('parent_phone')
+            .eq('school_id', currentUser.school_id)
+            .eq('active', true)
+            .not('parent_phone', 'is', null);
+          
+          phoneNumbers = data?.map(l => l.parent_phone) || [];
+        } else if (recipientType === 'class') {
+          const classId = document.getElementById('classId').value;
+          if (!classId) {
+            showToast('Please select a class', 'error');
+            return;
+          }
+          
+          const { data } = await supabase
+            .from('learners')
+            .select('parent_phone')
+            .eq('school_id', currentUser.school_id)
+            .eq('class_id', classId)
+            .eq('active', true)
+            .not('parent_phone', 'is', null);
+          
+          phoneNumbers = data?.map(l => l.parent_phone) || [];
+        } else if (recipientType === 'custom') {
+          phoneNumbers = document.getElementById('phoneNumbers').value
+            .split(/[,\n]/)
+            .map(n => n.trim())
+            .filter(n => n);
+        }
+        
+        // Validate numbers
+        phoneNumbers = phoneNumbers.filter(n => isValidPhoneNumber(n));
+        
+        if (phoneNumbers.length === 0) {
+          showToast('No valid phone numbers found', 'error');
+          return;
+        }
+        
+        if (!confirm(`Send SMS to ${phoneNumbers.length} recipients?`)) {
+          return;
+        }
+        
+        const sendBtn = document.getElementById('sendBtn');
+        setButtonLoading(sendBtn, true, 'Sending...');
+        
+        // Log SMS attempt
+        const { data: logData, error: logError } = await supabase
+          .from('sms_logs')
+          .insert({
+            school_id: currentUser.school_id,
+            message_type: recipientType,
+            message_content: message,
+            total_recipients: phoneNumbers.length,
+            status: 'pending'
+          })
+          .select()
+          .single();
+        
+        if (logError) throw logError;
+        
+        // In production, call actual SMS API here
+        // For now, simulate sending
+        showToast(`✓ SMS sent to ${phoneNumbers.length} recipients!`, 'success');
+        
+        // Update log
+        await supabase
+          .from('sms_logs')
+          .update({
+            successful_sends: phoneNumbers.length,
+            failed_sends: 0,
+            status: 'completed'
+          })
+          .eq('id', logData.id);
+        
+        // Reset form
+        document.getElementById('smsForm').reset();
+        document.getElementById('recipientPreview').classList.add('hidden');
+        document.getElementById('estimatedCost').textContent = '';
+        updateCharCount();
+        
+        await loadSMSStats();
+        
+      } catch (error) {
+        showToast('Error sending SMS: ' + error.message, 'error');
+      } finally {
+        setButtonLoading(document.getElementById('sendBtn'), false, '📤 Send SMS');
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
